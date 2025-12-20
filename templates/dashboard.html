@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>SEO Results Dashboard</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@300;400;500;600;700&amp;family=Noto+Sans:wght@400;500;700&amp;display=swap"
+        rel="stylesheet" />
+    <!-- Material Symbols -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Theme Configuration -->
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f9f506",
+                        "background-light": "#f8f8f5",
+                        "background-dark": "#23220f",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#1c1c12",
+                        "border-light": "#e6e6dc",
+                        "border-dark": "#3a3a2a",
+                    },
+                    fontFamily: {
+                        "display": ["Spline Sans", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    borderRadius: { "DEFAULT": "1rem", "lg": "1.5rem", "xl": "2rem", "2xl": "3rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #e6e6dc;
+            border-radius: 3px;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #3a3a2a;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark font-display text-[#181811] dark:text-[#f2f2e8] min-h-screen flex overflow-hidden selection:bg-primary selection:text-black">
+    <!-- Sidebar Navigation -->
+    <aside
+        class="w-64 flex-shrink-0 border-r border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark flex flex-col justify-between overflow-y-auto hidden md:flex sticky top-0 h-screen z-20">
+        <div class="flex flex-col p-4 gap-6">
+            <!-- Brand -->
+            <div class="flex items-center gap-3 px-2">
+                <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-black">
+                    <span class="material-symbols-outlined text-[20px]">analytics</span>
+                </div>
+                <div class="flex flex-col">
+                    <h1 class="text-base font-bold leading-none">SEO Pro</h1>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Enterprise Plan</p>
+                </div>
+            </div>
+            <!-- Navigation Links -->
+            <nav class="flex flex-col gap-1">
+                <a class="flex items-center gap-3 px-3 py-2.5 rounded-full bg-primary/20 text-black dark:text-[#f9f506] font-medium group"
+                    href="#">
+                    <span
+                        class="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">dashboard</span>
+                    <span>Dashboard</span>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2.5 rounded-full hover:bg-background-light dark:hover:bg-background-dark text-gray-600 dark:text-gray-300 transition-colors"
+                    href="#">
+                    <span class="material-symbols-outlined text-[20px]">check_circle</span>
+                    <span>Site Audit</span>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2.5 rounded-full hover:bg-background-light dark:hover:bg-background-dark text-gray-600 dark:text-gray-300 transition-colors"
+                    href="#">
+                    <span class="material-symbols-outlined text-[20px]">trending_up</span>
+                    <span>Rank Tracker</span>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2.5 rounded-full hover:bg-background-light dark:hover:bg-background-dark text-gray-600 dark:text-gray-300 transition-colors"
+                    href="#">
+                    <span class="material-symbols-outlined text-[20px]">link</span>
+                    <span>Backlink Profile</span>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2.5 rounded-full hover:bg-background-light dark:hover:bg-background-dark text-gray-600 dark:text-gray-300 transition-colors"
+                    href="#">
+                    <span class="material-symbols-outlined text-[20px]">content_paste_search</span>
+                    <span>Content Audit</span>
+                </a>
+            </nav>
+        </div>
+        <!-- Bottom Actions -->
+        <div class="p-4 border-t border-border-light dark:border-border-dark flex flex-col gap-2">
+            <a class="flex items-center gap-3 px-3 py-2.5 rounded-full hover:bg-background-light dark:hover:bg-background-dark text-gray-600 dark:text-gray-300 transition-colors"
+                href="#">
+                <span class="material-symbols-outlined text-[20px]">settings</span>
+                <span>Settings</span>
+            </a>
+            <div class="flex items-center gap-3 mt-2 px-3">
+                <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 bg-cover bg-center"
+                    data-alt="User profile avatar placeholder"
+                    style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBAqT1mtvQwSoLnFze-N-TtvX4Pg27PHrOmNODf2u98of2UO0y0F3qRFzHwBO8hsue_hqsNao0UOv04k3n236cgyljuzoULZNIFywy9vhp8lUqkAPfzNDYRu3hVsEBjGMuJbYIZ7SHEyYVN7wYrg7lPzdzEjA129j963CdaQTp6UsORmh0cd4jXrKoxWmenCciJDOuwktpcAeyrXuLJiSt8YL0xp4Ma0asICF6_DcnLHy0EgJSmERoQuBauNWAnSG9QzXkXpscxgf9E');">
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-sm font-medium">Jane Doe</span>
+                    <span class="text-xs text-gray-500">jane@example.com</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+    <!-- Main Layout -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+        <!-- Top Header -->
+        <header
+            class="h-20 flex-shrink-0 border-b border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark flex items-center justify-between px-6 z-10">
+            <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
+                <h2 class="text-xl md:text-2xl font-bold tracking-tight">Site Audit: <span
+                        class="text-gray-500 font-normal">example.com</span></h2>
+                <span class="hidden md:inline-block w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                <p class="text-xs md:text-sm text-gray-500 dark:text-gray-400">Last crawled: Oct 24, 2023 • 1,240 pages
+                </p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button
+                    class="hidden md:flex items-center gap-2 px-4 py-2 rounded-full border border-border-light dark:border-border-dark hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm font-medium">
+                    <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                    <span>Oct 1 - Oct 24</span>
+                </button>
+                <button
+                    class="flex items-center gap-2 px-5 py-2 rounded-full bg-primary text-[#181811] text-sm font-bold shadow-sm hover:bg-[#eaea05] transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">download</span>
+                    <span>Export Report</span>
+                </button>
+            </div>
+        </header>
+        <!-- Scrollable Content -->
+        <main class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
+            <div class="max-w-[1200px] mx-auto flex flex-col gap-8">
+                <!-- Section: Overview Stats -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Big Score Card -->
+                    <div
+                        class="lg:col-span-4 bg-surface-light dark:bg-surface-dark rounded-xl p-6 border border-border-light dark:border-border-dark flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <span class="material-symbols-outlined text-[120px]">health_and_safety</span>
+                        </div>
+                        <div class="flex justify-between items-start z-10">
+                            <div>
+                                <h3 class="text-lg font-medium text-gray-600 dark:text-gray-300">Overall Health Score
+                                </h3>
+                                <p class="text-sm text-gray-400 mt-1">Compared to last week</p>
+                            </div>
+                            <span
+                                class="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold px-2 py-1 rounded-full">+4%</span>
+                        </div>
+                        <div class="flex items-center gap-6 mt-6 mb-2 z-10">
+                            <!-- Circular Progress Simulation -->
+                            <div class="relative w-32 h-32 flex items-center justify-center">
+                                <svg class="w-full h-full transform -rotate-90">
+                                    <circle class="text-gray-100 dark:text-gray-800" cx="64" cy="64" fill="transparent"
+                                        r="56" stroke="currentColor" stroke-width="12"></circle>
+                                    <circle class="text-primary" cx="64" cy="64" fill="transparent" r="56"
+                                        stroke="#f9f506" stroke-dasharray="351.86" stroke-dashoffset="100"
+                                        stroke-linecap="round" stroke-width="12"></circle>
+                                </svg>
+                                <span class="absolute text-3xl font-bold text-[#181811] dark:text-white">72</span>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <p class="text-2xl font-bold">Good</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 leading-snug">Your site health is
+                                    better than 65% of competitors.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Stats Grid -->
+                    <div class="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <!-- Errors -->
+                        <div
+                            class="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-border-light dark:border-border-dark flex flex-col justify-center gap-3 hover:border-red-200 dark:hover:border-red-900 transition-colors">
+                            <div
+                                class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center text-red-600 dark:text-red-400">
+                                <span class="material-symbols-outlined">error</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Errors</p>
+                                <div class="flex items-end gap-2">
+                                    <p class="text-3xl font-bold text-[#181811] dark:text-white">14</p>
+                                    <span class="text-xs font-medium text-red-600 mb-1 flex items-center"><span
+                                            class="material-symbols-outlined text-[14px]">arrow_upward</span> 2</span>
+                                </div>
+                            </div>
+                            <div class="h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-red-500 w-[25%] rounded-full"></div>
+                            </div>
+                        </div>
+                        <!-- Warnings -->
+                        <div
+                            class="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-border-light dark:border-border-dark flex flex-col justify-center gap-3 hover:border-orange-200 dark:hover:border-orange-900 transition-colors">
+                            <div
+                                class="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center text-orange-600 dark:text-orange-400">
+                                <span class="material-symbols-outlined">warning</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Warnings</p>
+                                <div class="flex items-end gap-2">
+                                    <p class="text-3xl font-bold text-[#181811] dark:text-white">36</p>
+                                    <span class="text-xs font-medium text-orange-600 mb-1 flex items-center"><span
+                                            class="material-symbols-outlined text-[14px]">arrow_upward</span> 12</span>
+                                </div>
+                            </div>
+                            <div class="h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-orange-500 w-[45%] rounded-full"></div>
+                            </div>
+                        </div>
+                        <!-- Notices -->
+                        <div
+                            class="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-border-light dark:border-border-dark flex flex-col justify-center gap-3 hover:border-blue-200 dark:hover:border-blue-900 transition-colors">
+                            <div
+                                class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                <span class="material-symbols-outlined">info</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Notices</p>
+                                <div class="flex items-end gap-2">
+                                    <p class="text-3xl font-bold text-[#181811] dark:text-white">125</p>
+                                    <span class="text-xs font-medium text-green-600 mb-1 flex items-center"><span
+                                            class="material-symbols-outlined text-[14px]">arrow_downward</span> 5</span>
+                                </div>
+                            </div>
+                            <div class="h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-blue-500 w-[70%] rounded-full"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Section: Pillars & Trends -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- SEO Pillars -->
+                    <div
+                        class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-lg font-bold">SEO Performance Pillars</h3>
+                            <button
+                                class="text-xs font-bold text-gray-500 hover:text-primary transition-colors uppercase tracking-wider">View
+                                Details</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Technical -->
+                            <div
+                                class="p-4 rounded-lg bg-background-light dark:bg-background-dark/50 flex flex-col gap-2">
+                                <div class="flex justify-between items-start">
+                                    <span class="text-sm font-medium text-gray-600 dark:text-gray-300">Technical</span>
+                                    <span class="material-symbols-outlined text-gray-400 text-[18px]">dns</span>
+                                </div>
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-2xl font-bold">82</span>
+                                    <span class="text-xs text-green-600">Good</span>
+                                </div>
+                                <div class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mt-1">
+                                    <div class="h-full bg-green-500 w-[82%] rounded-full"></div>
+                                </div>
+                            </div>
+                            <!-- On-Page -->
+                            <div
+                                class="p-4 rounded-lg bg-background-light dark:bg-background-dark/50 flex flex-col gap-2">
+                                <div class="flex justify-between items-start">
+                                    <span class="text-sm font-medium text-gray-600 dark:text-gray-300">On-Page</span>
+                                    <span class="material-symbols-outlined text-gray-400 text-[18px]">article</span>
+                                </div>
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-2xl font-bold">90</span>
+                                    <span class="text-xs text-green-600">Excellent</span>
+                                </div>
+                                <div class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mt-1">
+                                    <div class="h-full bg-green-500 w-[90%] rounded-full"></div>
+                                </div>
+                            </div>
+                            <!-- Performance -->
+                            <div
+                                class="p-4 rounded-lg bg-background-light dark:bg-background-dark/50 flex flex-col gap-2">
+                                <div class="flex justify-between items-start">
+                                    <span class="text-sm font-medium text-gray-600 dark:text-gray-300">Speed</span>
+                                    <span class="material-symbols-outlined text-gray-400 text-[18px]">speed</span>
+                                </div>
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-2xl font-bold">55</span>
+                                    <span class="text-xs text-red-500">Poor</span>
+                                </div>
+                                <div class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mt-1">
+                                    <div class="h-full bg-red-500 w-[55%] rounded-full"></div>
+                                </div>
+                            </div>
+                            <!-- Content -->
+                            <div
+                                class="p-4 rounded-lg bg-background-light dark:bg-background-dark/50 flex flex-col gap-2">
+                                <div class="flex justify-between items-start">
+                                    <span class="text-sm font-medium text-gray-600 dark:text-gray-300">Content</span>
+                                    <span class="material-symbols-outlined text-gray-400 text-[18px]">description</span>
+                                </div>
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-2xl font-bold">65</span>
+                                    <span class="text-xs text-orange-500">Fair</span>
+                                </div>
+                                <div class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mt-1">
+                                    <div class="h-full bg-orange-400 w-[65%] rounded-full"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Trend Chart -->
+                    <div
+                        class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark p-6 flex flex-col">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold">Health Score Trend</h3>
+                            <div class="flex gap-2">
+                                <span
+                                    class="text-xs font-medium text-gray-400 bg-background-light dark:bg-background-dark px-2 py-1 rounded-full">30
+                                    Days</span>
+                            </div>
+                        </div>
+                        <div class="flex-1 flex flex-col justify-end">
+                            <svg class="w-full" fill="none" height="180" preserveaspectratio="none"
+                                viewbox="0 0 472 150" width="100%" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                    <lineargradient gradientunits="userSpaceOnUse" id="paint0_linear" x1="236" x2="236"
+                                        y1="0" y2="150">
+                                        <stop stop-color="#f9f506" stop-opacity="0.2"></stop>
+                                        <stop offset="1" stop-color="#f9f506" stop-opacity="0"></stop>
+                                    </lineargradient>
+                                </defs>
+                                <path
+                                    d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25V150H0V109Z"
+                                    fill="url(#paint0_linear)"></path>
+                                <path
+                                    d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25"
+                                    stroke="#f9f506" stroke-linecap="round" stroke-width="3"></path>
+                            </svg>
+                            <div
+                                class="flex justify-between mt-4 px-2 border-t border-border-light dark:border-border-dark pt-2">
+                                <p class="text-xs font-medium text-gray-400">Week 1</p>
+                                <p class="text-xs font-medium text-gray-400">Week 2</p>
+                                <p class="text-xs font-medium text-gray-400">Week 3</p>
+                                <p class="text-xs font-medium text-gray-400">Week 4</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Section: Actionable Issues -->
+                <div class="flex flex-col gap-4">
+                    <h2 class="text-xl font-bold px-1">Top Issues to Fix</h2>
+                    <!-- Issue Card 1: Critical -->
+                    <div
+                        class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark p-0 overflow-hidden shadow-sm">
+                        <div class="p-6 flex flex-col md:flex-row md:items-start gap-6">
+                            <div class="flex-1 flex flex-col gap-2">
+                                <div class="flex items-center gap-3 mb-1">
+                                    <span
+                                        class="px-2.5 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-bold uppercase tracking-wide">Critical</span>
+                                    <span class="text-xs text-gray-400 font-mono">5 Pages Affected</span>
+                                </div>
+                                <h3 class="text-lg font-bold text-[#181811] dark:text-white">Duplicate Title Tags</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed max-w-2xl">
+                                    Multiple pages on your website share the same title tag. This confuses search
+                                    engines about which page is relevant for a specific query and can lead to lower
+                                    rankings for both pages.
+                                </p>
+                            </div>
+                            <div
+                                class="flex items-center gap-4 flex-shrink-0 md:border-l md:border-border-light md:dark:border-border-dark md:pl-6 md:h-full">
+                                <div class="flex flex-col gap-2 items-start md:items-end w-full">
+                                    <span class="text-xs font-bold text-gray-500 uppercase">Difficulty</span>
+                                    <div class="flex gap-1">
+                                        <div class="w-2 h-2 rounded-full bg-primary"></div>
+                                        <div class="w-2 h-2 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                                        <div class="w-2 h-2 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                                    </div>
+                                    <span class="text-xs text-gray-500 mt-1">Easy</span>
+                                </div>
+                                <button
+                                    class="bg-primary hover:bg-[#eaea05] text-black text-sm font-bold px-5 py-2.5 rounded-full transition-colors whitespace-nowrap">
+                                    Fix Now
+                                </button>
+                            </div>
+                        </div>
+                        <div
+                            class="bg-background-light dark:bg-background-dark/30 px-6 py-3 border-t border-border-light dark:border-border-dark flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px] text-gray-500">lightbulb</span>
+                            <span class="text-sm text-gray-600 dark:text-gray-400"><span
+                                    class="font-bold text-gray-800 dark:text-gray-200">How to fix:</span> Ensure every
+                                page has a unique title tag that accurately describes its content.</span>
+                        </div>
+                    </div>
+                    <!-- Issue Card 2: Warning -->
+                    <div
+                        class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark p-0 overflow-hidden shadow-sm">
+                        <div class="p-6 flex flex-col md:flex-row md:items-start gap-6">
+                            <div class="flex-1 flex flex-col gap-2">
+                                <div class="flex items-center gap-3 mb-1">
+                                    <span
+                                        class="px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs font-bold uppercase tracking-wide">Warning</span>
+                                    <span class="text-xs text-gray-400 font-mono">12 Images Affected</span>
+                                </div>
+                                <h3 class="text-lg font-bold text-[#181811] dark:text-white">Images Missing Alt Text
+                                </h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed max-w-2xl">
+                                    Search engines cannot "see" images. Alt text provides context for image content,
+                                    which helps with ranking in image search and improves accessibility for screen
+                                    readers.
+                                </p>
+                            </div>
+                            <div
+                                class="flex items-center gap-4 flex-shrink-0 md:border-l md:border-border-light md:dark:border-border-dark md:pl-6 md:h-full">
+                                <div class="flex flex-col gap-2 items-start md:items-end w-full">
+                                    <span class="text-xs font-bold text-gray-500 uppercase">Difficulty</span>
+                                    <div class="flex gap-1">
+                                        <div class="w-2 h-2 rounded-full bg-primary"></div>
+                                        <div class="w-2 h-2 rounded-full bg-primary"></div>
+                                        <div class="w-2 h-2 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                                    </div>
+                                    <span class="text-xs text-gray-500 mt-1">Medium</span>
+                                </div>
+                                <button
+                                    class="bg-primary hover:bg-[#eaea05] text-black text-sm font-bold px-5 py-2.5 rounded-full transition-colors whitespace-nowrap">
+                                    Fix Now
+                                </button>
+                            </div>
+                        </div>
+                        <div
+                            class="bg-background-light dark:bg-background-dark/30 px-6 py-3 border-t border-border-light dark:border-border-dark flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px] text-gray-500">lightbulb</span>
+                            <span class="text-sm text-gray-600 dark:text-gray-400"><span
+                                    class="font-bold text-gray-800 dark:text-gray-200">How to fix:</span> Add
+                                descriptive alt text to all img tags in your HTML.</span>
+                        </div>
+                    </div>
+                    <!-- Issue Card 3: Notice -->
+                    <div
+                        class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark p-0 overflow-hidden shadow-sm">
+                        <div class="p-6 flex flex-col md:flex-row md:items-start gap-6">
+                            <div class="flex-1 flex flex-col gap-2">
+                                <div class="flex items-center gap-3 mb-1">
+                                    <span
+                                        class="px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold uppercase tracking-wide">Notice</span>
+                                    <span class="text-xs text-gray-400 font-mono">Site-wide</span>
+                                </div>
+                                <h3 class="text-lg font-bold text-[#181811] dark:text-white">Review Robots.txt</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed max-w-2xl">
+                                    Your robots.txt file has not been updated in over 6 months. It's good practice to
+                                    review it to ensure you aren't accidentally blocking important pages.
+                                </p>
+                            </div>
+                            <div
+                                class="flex items-center gap-4 flex-shrink-0 md:border-l md:border-border-light md:dark:border-border-dark md:pl-6 md:h-full">
+                                <div class="flex flex-col gap-2 items-start md:items-end w-full">
+                                    <span class="text-xs font-bold text-gray-500 uppercase">Difficulty</span>
+                                    <div class="flex gap-1">
+                                        <div class="w-2 h-2 rounded-full bg-primary"></div>
+                                        <div class="w-2 h-2 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                                        <div class="w-2 h-2 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                                    </div>
+                                    <span class="text-xs text-gray-500 mt-1">Easy</span>
+                                </div>
+                                <button
+                                    class="border border-border-dark/20 dark:border-border-light/20 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold px-5 py-2.5 rounded-full transition-colors whitespace-nowrap">
+                                    Review
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Footer -->
+                <div class="pt-8 pb-4 text-center text-xs text-gray-400">
+                    <p>© 2023 SEO Pro. All rights reserved. <a class="underline" href="#">Privacy Policy</a></p>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>

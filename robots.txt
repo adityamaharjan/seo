@@ -1,3 +1,29 @@
+# Block unknown / generic crawlers
 User-agent: *
-Disallow: /
-Allow: /$
+Disallow: /docs
+Disallow: /admin
+Disallow: /redoc
+Disallow: /openapi.json
+Disallow: /api
+Disallow: /seoapi
+Disallow: /users
+Disallow: /docs
+
+# Explicitly allow major search engines
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: Yandex
+Allow: /

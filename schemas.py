@@ -37,7 +37,6 @@ class QuotaOut(BaseModel):
     used_quota: int
     reset_date: Optional[datetime]
     updated_at: datetime
-
     model_config = ConfigDict(from_attributes=True)
 
 

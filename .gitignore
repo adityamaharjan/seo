@@ -30,7 +30,7 @@ share/
 
 # IDE-specific files (uncomment the ones you use)
 # .idea/  # PyCharm
-# .vscode/ # VS Code
+.vscode/ # VS Code
 
 # Dependency caches
 .pip/

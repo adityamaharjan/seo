@@ -15,8 +15,7 @@ from datetime import datetime
 
 
 app = FastAPI(title="SEO Analysis API", version="0.0.1", description="Analyze and generate SEO reports for web pages.")
-
-
+# --- Password Hashing ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # --- Dependency ---
@@ -29,13 +28,15 @@ def get_db():
 
 
 # --- Utils ---
+
+# hash password
 def hash_password(password: str) -> str:
     # Step 1: Pre-hash the password with SHA-256 (any length supported)
     sha256_digest = hashlib.sha256(password.encode("utf-8")).digest()
     # Step 2: Pass the digest to bcrypt
     return pwd_context.hash(sha256_digest)
 
-
+# verify password with hash from database
 def verify_password(password: str, hashed: str) -> bool:
     sha256_digest = hashlib.sha256(password.encode("utf-8")).digest()
     return pwd_context.verify(sha256_digest, hashed)
@@ -45,7 +46,7 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 
-
+#core seo analysis endpoint
 @app.get("/seoapi")
 async def analyze(url: str, user_id: int, db: Session = Depends(get_db)):
     parsed = urlparse(url)
@@ -75,10 +76,10 @@ async def analyze(url: str, user_id: int, db: Session = Depends(get_db)):
     }
 
 
+##############################################################################################
 
-
-
-@app.post("/users", response_model=schemas.UserOut)
+# user creation / signup
+@app.post("/signup", response_model=schemas.UserOut)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     exists = db.query(models.Users).filter(
         (models.Users.email == user.email) |
@@ -106,6 +107,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 
+# user login check
 @app.post("/login", response_model=schemas.UserOut)
 def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(models.Users).filter(models.Users.email == user.email).first()
@@ -114,3 +116,5 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
     elif not verify_password(user.password, str(db_user.hashed_password)):
         raise HTTPException(status_code=400, detail="Invalid credentials")
     return db_user
+
+

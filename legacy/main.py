@@ -4,7 +4,7 @@ import models
 import hashlib
 from passlib.context import CryptContext
 from fastapi import FastAPI, Request, Depends
-from seo_test import run_analysis, generate_json_response
+from seo_analyzer import AsyncSEOAnalyzer
 from urllib.parse import urlparse
 from fastapi.responses import HTMLResponse
 from fastapi.exceptions import HTTPException
@@ -48,16 +48,16 @@ def verify_password(password: str, hashed: str) -> bool:
 
 #core seo analysis endpoint
 @app.get("/seoapi")
-async def analyze(url: str, user_id: int, db: Session = Depends(get_db)):
+async def analyze(url: str, db: Session = Depends(get_db)):
     parsed = urlparse(url)
 
-    report_results, dominant_keyword = run_analysis(url)
-    json_output = generate_json_response(report_results)
-
+    dominant_keyword, json_output = await AsyncSEOAnalyzer(url).analyze()
+    
     # 🔹 STORE IN DATABASE
     report = SEOReport(
         url=url,
-        user_id=user_id,  # TEMP: replace later with authenticated user ID
+        user_id=1,  # TEMP: replace later with authenticated user ID
+        title=json_output.get("checks", {}).get("title_tag", {}).get("value", "") if isinstance(json_output, dict) else "",
         dominant_keyword=dominant_keyword,
         results=json_output,
         

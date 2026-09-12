@@ -1,0 +1,4 @@
+# Single-page app fallback for Cloudflare Pages.
+# Real files are served first, so this only catches client-side routes
+# like /report/42. The 200 keeps the URL intact instead of redirecting.
+/*    /index.html   200

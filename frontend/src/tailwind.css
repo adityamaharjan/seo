@@ -1,0 +1,153 @@
+/**
+ * Tailwind entry for the shadcn/ui components on the landing page.
+ *
+ * Preflight is deliberately NOT imported. Tailwind's base reset would strip the
+ * element styling that `styles.css` and every existing app view depend on, so
+ * only the theme and the utility layer are pulled in. Tailwind here is additive:
+ * it styles the landing page without touching anything already built.
+ */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/*
+ * shadcn's tokens are mapped onto the design tokens this product already has,
+ * rather than given their own values. That keeps one source of truth for the
+ * palette: the existing light/dark definitions in styles.css swap under
+ * `prefers-color-scheme`, and these follow automatically.
+ */
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--bg);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--bg);
+  --color-popover-foreground: var(--fg);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-fg);
+  --color-secondary: var(--surface);
+  --color-secondary-foreground: var(--fg);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--surface);
+  --color-accent-foreground: var(--fg);
+  --color-destructive: var(--critical);
+  --color-destructive-foreground: var(--accent-fg);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-control: var(--border-control);
+  --color-accent-on-tint: var(--accent-on-tint);
+  --color-input: var(--border-control);
+  --color-ring: var(--accent);
+
+  --color-good: var(--good);
+  --color-warn: var(--warning);
+  --color-crit: var(--critical);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-accent-soft: var(--accent-soft);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius-lg);
+
+  --font-sans: var(--sans);
+  --font-mono: var(--mono);
+}
+
+/* Accordion open/close, which Radix drives with CSS custom properties. */
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+
+/*
+ * Without Tailwind's preflight the global element rules in styles.css still
+ * apply, and two of them fight the utilities on the landing page: anchors get
+ * an accent colour and a hover underline, and headings carry a fixed weight and
+ * letter-spacing. Neutralising them inside `.landing` only lets Tailwind take
+ * over there while every existing app view keeps the styling it was built with.
+ * `.landing a:hover` outranks the global `a:hover`, which a utility class alone
+ * would not.
+ */
+@layer base {
+  .landing a,
+  .landing a:hover {
+    color: inherit;
+    text-decoration: none;
+  }
+  .landing :is(h1, h2, h3, h4) {
+    font-weight: inherit;
+    letter-spacing: inherit;
+    line-height: inherit;
+  }
+}
+
+/*
+ * Scroll reveal.
+ *
+ * Elements start slightly low and transparent, then settle when they enter the
+ * viewport. The distance is deliberately small: at 14px it reads as the page
+ * composing itself, where a larger travel reads as a slideshow. Easing is a
+ * decelerate curve so motion arrives rather than stops.
+ *
+ * Anyone who has asked their system to reduce motion gets the finished state
+ * immediately, with no transition at all.
+ */
+@layer components {
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+    will-change: opacity, transform;
+  }
+  .reveal.is-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* A hairline that draws itself in, used under section headings. */
+  .rule {
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .reveal.is-in .rule,
+  .rule.is-in {
+    transform: none;
+  }
+
+  /* Interactive surfaces lift a little on hover. One pixel, not four. */
+  .lift {
+    transition:
+      transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.25s ease;
+  }
+  .lift:hover {
+    transform: translateY(-1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .rule,
+  .lift {
+    transition: none !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+  .rule {
+    transform: none;
+  }
+}

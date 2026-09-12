@@ -1,6 +1,8 @@
-/.vscode
-
+.vscode/
+.github/
 .env
+.env.*
+!.env.example
 .seo
 
 
@@ -37,8 +39,11 @@ share/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
-models.py
-database.py
 # OS-specific files
 .DS_Store # macOS
 Thumbs.db # Windows
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/

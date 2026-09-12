@@ -1,0 +1,16 @@
+# Reference copy of the API service (matches /etc/systemd/system/uvicorn.service).
+[Unit]
+Description=Uvicorn FastAPI Service seo
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/seo
+ExecStart=/var/www/seo/.seo/bin/uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 3
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

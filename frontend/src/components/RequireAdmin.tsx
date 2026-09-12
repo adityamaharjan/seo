@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Lock } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { EmptyState } from './Page'
-import { CenterNote } from './ReportStates'
+import { CenterNote } from './CenterNote'
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const { isAdmin, loading } = useAuth()

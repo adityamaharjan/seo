@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preview</title>
+    <!--
+      The harness has no ThemeProvider, so it mirrors index.html's startup
+      script to pick up the browser's colour scheme. shot.mjs drives this by
+      setting colorScheme on the context, which is only visible to the media
+      query, and the palette is a class now.
+    -->
+    <script>
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark')
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

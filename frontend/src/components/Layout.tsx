@@ -6,10 +6,18 @@
  * side: the username and a bare "Sign out" button have become a real menu, so
  * account, admin and sign-out live together instead of being spread between the
  * header and the nav, and the destructive one is not a single stray click away.
+ *
+ * One row, and it must stay one row down to a 320px phone. Nothing here wraps
+ * or scrolls sideways, so everything that is duplicated elsewhere is dropped on
+ * a narrow screen instead: the admin link and the admin badge both have a home
+ * in the account menu, and the username gets a share of the width rather than a
+ * fixed one. What survives at every width is the two things a signed-in person
+ * actually navigates between, plus the way out.
  */
 import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, LogOut, Shield, UserRound } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
+import { ThemeToggle } from './ThemeToggle'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -51,7 +59,7 @@ export function Layout() {
       </a>
 
       <header className="sticky top-0 z-50 h-(--header-h) border-b border-border bg-background/85 backdrop-blur-md backdrop-saturate-150">
-        <div className="mx-auto flex h-full max-w-(--measure) items-center gap-3 px-5 sm:px-6">
+        <div className="mx-auto flex h-full max-w-(--measure) items-center gap-2 px-5 sm:gap-3 sm:px-6">
           <Link
             to="/"
             className="flex shrink-0 items-center gap-2.5 font-semibold tracking-tight whitespace-nowrap"
@@ -68,7 +76,7 @@ export function Layout() {
                 end={item.end}
                 className={({ isActive }) =>
                   cn(
-                    'rounded-lg px-2.5 py-1.5 text-[13.5px] transition-colors sm:px-3',
+                    'rounded-lg px-2 py-1.5 text-[13.5px] whitespace-nowrap transition-colors sm:px-3',
                     isActive
                       ? 'bg-accent-soft font-medium text-accent-on-tint'
                       : 'text-muted-foreground hover:bg-surface hover:text-foreground',
@@ -83,7 +91,7 @@ export function Layout() {
                 to="/admin"
                 className={({ isActive }) =>
                   cn(
-                    'rounded-lg px-2.5 py-1.5 text-[13.5px] transition-colors sm:px-3',
+                    'hidden rounded-lg px-2 py-1.5 text-[13.5px] whitespace-nowrap transition-colors sm:inline-block sm:px-3',
                     isActive
                       ? 'bg-accent-soft font-medium text-accent-on-tint'
                       : 'text-muted-foreground hover:bg-surface hover:text-foreground',
@@ -97,28 +105,38 @@ export function Layout() {
 
           <span className="flex-1" />
 
+          <ThemeToggle className="mr-0.5 max-sm:size-9" />
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="max-w-[40vw] gap-1.5 px-2 font-medium sm:max-w-none"
+                aria-label={`Account menu for ${user?.username ?? 'your account'}`}
+                className="gap-1.5 px-2 font-medium max-sm:size-9 max-sm:px-0 sm:max-w-[34vw] lg:max-w-none"
               >
-                <span className="truncate">{user?.username}</span>
+                {/* Below sm the name is dropped for an icon and lives in the
+                    menu instead. A truncated username is not worth the 60-odd
+                    pixels it costs a phone-width header. */}
+                <UserRound aria-hidden="true" className="sm:hidden" />
+                <span className="hidden truncate sm:inline">{user?.username}</span>
                 {isAdmin ? (
                   <Badge
                     variant="info"
-                    className="px-1.5 py-0 text-[9.5px] font-bold tracking-[0.06em] uppercase"
+                    className="hidden px-1.5 py-0 text-[9.5px] font-bold tracking-[0.06em] uppercase sm:inline-flex"
                   >
                     Admin
                   </Badge>
                 ) : null}
-                <ChevronDown className="size-3.5 opacity-55" />
+                <ChevronDown className="size-3.5 opacity-55 max-sm:hidden" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[200px]">
               <DropdownMenuLabel className="normal-case">
-                <span className="block truncate text-[13px] font-normal tracking-normal text-foreground">
+                <span className="block truncate text-[13px] font-medium tracking-normal text-foreground sm:hidden">
+                  {user?.username}
+                </span>
+                <span className="block truncate text-[13px] font-normal tracking-normal text-muted-foreground sm:text-foreground">
                   {user?.email}
                 </span>
               </DropdownMenuLabel>

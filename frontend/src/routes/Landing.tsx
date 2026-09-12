@@ -21,6 +21,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, Search } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { Reveal } from '../components/Reveal'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { ScoreRing } from '../components/ScoreRing'
 import {
   Accordion,
@@ -189,6 +190,7 @@ export function Landing() {
         </nav>
         <span className="flex-1" />
         <div className="flex items-center gap-1.5">
+          <ThemeToggle className="size-9" />
           {signedIn ? (
             <>
               <Button asChild variant="ghost" size="sm">

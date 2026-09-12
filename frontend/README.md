@@ -55,8 +55,13 @@ npm run preview      # serve dist/ locally to check the real build
 npm run build
 ```
 
-Output lands in `dist/`: an `index.html` plus fingerprinted assets. The bundle
-is roughly 90 KB gzipped with no runtime dependency on any CDN.
+Output lands in `dist/`: an `index.html` plus fingerprinted assets, and no
+runtime dependency on any CDN.
+
+Every view is loaded on demand, and React and the router are split into their
+own chunks so a deploy that touches a view leaves them cached. A first visit to
+the landing page is about 120 KB gzipped across four files; moving into the app
+fetches the shell and that view only.
 
 ## Deploying
 
@@ -198,29 +203,46 @@ src/
   auth/
     AuthContext.tsx  who is signed in; login, signup, logout
     tokens.ts        token storage
-  components/      Layout, RequireAuth, ScoreRing, StatusPill, QuotaBar, Notice
-  components/ui/   shadcn/ui components, used by the landing page only
+  theme/
+    ThemeContext.tsx light, dark or follow the system
+  components/      Layout, AuthShell, RequireAuth, ScoreRing, StatusPill,
+                   QuotaBar, Notice, ThemeToggle, RouteFallback
+  components/Page.tsx        the layout vocabulary every view is built from:
+                             PageHeader, Section, Panel, Stat, EmptyState
+  components/ui/   shadcn/ui components, used everywhere
   components/ReportBody.tsx  one page's full report, shared by both features
   routes/          Landing, Login, Signup, PageAudit, Report,
                    SiteAudit, SiteAuditReport, SiteAuditPage, Account, Admin
+  dev/             visual preview harness, not shipped
   lib/format.ts    dates, durations, sizes, check values
-  tailwind.css     Tailwind entry (no preflight) + shadcn token bridge
-  styles.css       design tokens and every app component style
+  tailwind.css     the app's only stylesheet: tokens, the shadcn token
+                   bridge, and the handful of keyframes views compose with
 ```
 
-Two styling systems, split by surface. The **app** is one hand-written
-stylesheet (`styles.css`) built on CSS custom properties, with light and dark
-themes that follow the operating system. The **landing page** uses Tailwind and
-shadcn/ui components in `components/ui/`.
+One styling system across every surface. Views are Tailwind utilities on
+shadcn/ui primitives, and the only thing `tailwind.css` holds is what utilities
+cannot express: the palette, the mapping from it onto the names shadcn expects,
+and the motion primitives. Tailwind's preflight is imported, so the reset
+behaves the way its documentation says it does.
 
-They coexist without fighting because Tailwind's preflight is deliberately not
-imported: `tailwind.css` pulls in only the theme and utility layers, so the base
-reset never touches the element styling every app view depends on. shadcn's
-tokens are mapped onto the existing design tokens rather than given their own
-values, so both surfaces share one palette and one light/dark switch.
+shadcn's token names are aliases for the palette rather than separate values, so
+there is exactly one definition of each colour and one place to change it.
 
 Adding a shadcn component is `npx shadcn@latest add <name>`; it lands in
 `src/components/ui/` and is yours to edit.
+
+### Theme
+
+Light, dark, or follow the operating system, chosen from the control in the
+header and remembered in `localStorage` under `seo-theme`. Dark is a `dark`
+class on `<html>`, written by a short inline script in `index.html` before the
+first paint so the page never flashes the wrong palette on the way to the right
+one; `ThemeProvider` resolves "system" against `prefers-color-scheme` and keeps
+following it as the OS changes.
+
+Changing the palette means editing the two token blocks at the top of
+`tailwind.css` and the two colours the startup script and `ThemeContext.tsx`
+use for the `theme-color` meta tag.
 
 ## How auth works
 

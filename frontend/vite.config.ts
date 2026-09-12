@@ -25,6 +25,20 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: false,
+      rollupOptions: {
+        output: {
+          /*
+           * React and the router are the half of the bundle that does not
+           * change when this app does. Splitting them out means a deploy that
+           * touches a view leaves the framework chunk cached rather than
+           * re-downloading it, and the entry chunk shrinks to app code.
+           */
+          manualChunks: {
+            react: ['react', 'react-dom', 'react-dom/client'],
+            router: ['react-router-dom'],
+          },
+        },
+      },
     },
   }
 })

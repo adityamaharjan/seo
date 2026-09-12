@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { CenterNote } from './ReportStates'
+import { CenterNote } from './CenterNote'
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()

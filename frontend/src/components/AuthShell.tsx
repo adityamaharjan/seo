@@ -9,6 +9,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Panel } from './Page'
+import { ThemeToggle } from './ThemeToggle'
 
 export function AuthShell({
   title,
@@ -22,7 +23,13 @@ export function AuthShell({
   footer: ReactNode
 }) {
   return (
-    <div className="grid min-h-dvh place-items-center px-5 py-12">
+    <div className="relative grid min-h-dvh place-items-center px-5 py-12">
+      {/*
+        Parked in the corner rather than in the card. It belongs to the window,
+        not to the form, and putting it inside would make it look like a field.
+      */}
+      <ThemeToggle className="absolute top-4 right-4 size-9" />
+
       <div className="w-full max-w-[390px]">
         <div className="text-center">
           <Link

@@ -11,7 +11,10 @@ import { Notice } from './Notice'
 import { StatusPill } from './StatusPill'
 import { Spinner } from './Spinner'
 import { Panel } from './Page'
+import { CenterNote } from './CenterNote'
 import { Button } from '@/components/ui/button'
+
+export { CenterNote }
 
 /** Work that has been accepted and is still going. */
 export function PendingPanel({
@@ -111,17 +114,3 @@ export function FailedPanel({
 }
 
 /** The whole view, before the first response has landed. */
-export function CenterNote({ children }: { children: ReactNode }) {
-  return (
-    <div
-      className="grid min-h-[55vh] place-items-center gap-3 text-center text-muted-foreground"
-      role="status"
-      aria-live="polite"
-    >
-      <span className="flex items-center gap-2.5 text-[14px]">
-        <Spinner />
-        {children}
-      </span>
-    </div>
-  )
-}

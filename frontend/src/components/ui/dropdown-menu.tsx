@@ -1,5 +1,5 @@
 import * as React from "react"
-import { CheckIcon, ChevronRightIcon } from "lucide-react"
+import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
@@ -98,6 +98,49 @@ function DropdownMenuCheckboxItem({
   )
 }
 
+function DropdownMenuRadioGroup(
+  props: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>
+) {
+  return (
+    <DropdownMenuPrimitive.RadioGroup
+      data-slot="dropdown-menu-radio-group"
+      {...props}
+    />
+  )
+}
+
+/**
+ * One of a set of mutually exclusive choices.
+ *
+ * It shares the checkbox item's left gutter so a menu mixing the two keeps a
+ * single text column, and marks the selection with a filled dot rather than a
+ * tick: a tick reads as "on", which is the wrong idea when picking one of three.
+ */
+function DropdownMenuRadioItem({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.RadioItem>) {
+  return (
+    <DropdownMenuPrimitive.RadioItem
+      data-slot="dropdown-menu-radio-item"
+      className={cn(
+        "relative flex cursor-default items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-[13.5px] outline-none select-none focus:bg-surface-2 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      <span className="absolute left-2 flex size-3.5 items-center justify-center">
+        <DropdownMenuPrimitive.ItemIndicator>
+          <CircleIcon className="size-2 fill-current" />
+        </DropdownMenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </DropdownMenuPrimitive.RadioItem>
+  )
+}
+
 function DropdownMenuLabel({
   className,
   inset,
@@ -180,6 +223,8 @@ export {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,

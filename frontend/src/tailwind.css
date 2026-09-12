@@ -16,6 +16,17 @@
 @import 'tailwindcss';
 
 /*
+ * Dark mode is a class on <html>, not a bare media query.
+ *
+ * The media query alone could state what the OS preferred but gave the user no
+ * way to disagree with it, and half the reason people reach for a theme control
+ * is that their OS is set one way and this particular window wants the other.
+ * The provider resolves "system" to a concrete class before paint, so the CSS
+ * below only ever has two states to describe.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
  * Palette.
  *
  * The text colours here are carried over unchanged from the previous design and
@@ -24,6 +35,10 @@
  * radii are the parts that moved.
  */
 :root {
+  /* Native widgets — scrollbars, date pickers, form controls the browser
+     paints itself — follow this rather than the tokens below. */
+  color-scheme: light;
+
   --bg: #ffffff;
   --surface: #fafafa;
   --surface-2: #f4f4f5;
@@ -64,36 +79,36 @@
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b0b0e;
-    --surface: #141417;
-    --surface-2: #1c1c21;
-    --fg: #ededef;
-    --muted: #9a9aa3;
-    --border: #232329;
-    --border-strong: #2f2f37;
-    --border-control: #5f5f65;
-    --code-bg: #16161b;
+.dark {
+  color-scheme: dark;
 
-    --accent: #8b8bfb;
-    --accent-hover: #9c9cfc;
-    --accent-soft: rgba(139, 139, 251, 0.14);
-    --accent-on-tint: #8b8bfb;  /* already 5.6:1 on the dark tint */
-    --accent-fg: #11111a;
+  --bg: #0b0b0e;
+  --surface: #141417;
+  --surface-2: #1c1c21;
+  --fg: #ededef;
+  --muted: #9a9aa3;
+  --border: #232329;
+  --border-strong: #2f2f37;
+  --border-control: #5f5f65;
+  --code-bg: #16161b;
 
-    --good: #51cf66;
-    --good-soft: rgba(81, 207, 102, 0.14);
-    --warning: #ffd43b;
-    --warning-soft: rgba(255, 212, 59, 0.14);
-    --critical: #ff6b6b;
-    --critical-soft: rgba(255, 107, 107, 0.14);
-    --info: #74a9f2;
-    --info-soft: rgba(116, 169, 242, 0.14);
+  --accent: #8b8bfb;
+  --accent-hover: #9c9cfc;
+  --accent-soft: rgba(139, 139, 251, 0.14);
+  --accent-on-tint: #8b8bfb;  /* already 5.6:1 on the dark tint */
+  --accent-fg: #11111a;
 
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
-    --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.45);
-  }
+  --good: #51cf66;
+  --good-soft: rgba(81, 207, 102, 0.14);
+  --warning: #ffd43b;
+  --warning-soft: rgba(255, 212, 59, 0.14);
+  --critical: #ff6b6b;
+  --critical-soft: rgba(255, 107, 107, 0.14);
+  --info: #74a9f2;
+  --info-soft: rgba(116, 169, 242, 0.14);
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 /*
@@ -261,6 +276,11 @@
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Used to hold something invisible for a beat before it is worth showing. */
+@keyframes fade-in {
+  to { opacity: 1; }
 }
 
 /* The sweep across a loading placeholder. */

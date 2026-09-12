@@ -1,6 +1,6 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
 
 const badgeVariants = cva(
@@ -17,6 +17,17 @@ const badgeVariants = cva(
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
+
+        /*
+         * Status tones. These read the same scale the engine scores on, so a
+         * badge saying "critical" is the same red as the spine on the check it
+         * came from and as the number in the summary above it.
+         */
+        good: "bg-good-soft text-good",
+        warning: "bg-warn-soft text-warn",
+        critical: "bg-crit-soft text-crit",
+        info: "bg-info-soft text-info",
+        neutral: "bg-surface-2 text-muted-foreground",
       },
     },
     defaultVariants: {

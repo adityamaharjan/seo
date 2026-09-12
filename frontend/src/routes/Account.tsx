@@ -1,12 +1,21 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { ExternalLink } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { accountApi, apiKeysApi } from '../api/endpoints'
 import type { ApiKeySettings } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 import { Notice } from '../components/Notice'
+import { TextField } from '../components/Field'
+import { Spinner } from '../components/Spinner'
+import { PageHeader, Panel, Section } from '../components/Page'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate } from '../lib/format'
 
 const PSI_KEY_DOCS = 'https://developers.google.com/speed/docs/insights/v5/get-started'
+
+/** Forms here are read left to right, not scanned, so they stay one column. */
+const FORM_WIDTH = 'max-w-[420px]'
 
 export function Account() {
   const { user, refreshUser, logout } = useAuth()
@@ -77,122 +86,120 @@ export function Account() {
 
   return (
     <>
-      <div className="card">
-        <div className="card-title">Profile</div>
-        <p className="card-sub">
-          Member since {formatDate(user?.created_at)}
-          {user?.role === 'admin' ? ' · administrator' : ''}
-        </p>
+      <PageHeader
+        title="Account"
+        description={
+          <>
+            Member since {formatDate(user?.created_at)}
+            {user?.role === 'admin' ? ' · administrator' : ''}
+          </>
+        }
+      />
 
-        <Notice error={profileError} />
+      <Section title="Profile">
+        <Notice error={profileError} className="mb-4" />
         {profileDone && !profileError ? (
-          <Notice tone="info">Your profile has been updated.</Notice>
+          <Notice tone="success" className="mb-4">
+            Your profile has been updated.
+          </Notice>
         ) : null}
 
-        <form onSubmit={saveProfile} noValidate style={{ maxWidth: 420 }}>
-          <div className="field">
-            <label htmlFor="account-username">Username</label>
-            <input
-              id="account-username"
-              value={username}
-              minLength={3}
-              maxLength={50}
-              onChange={(e) => setUsername(e.target.value)}
-              aria-invalid={Boolean(profileFieldErrors.username)}
-            />
-            {profileFieldErrors.username ? (
-              <span className="error">{profileFieldErrors.username}</span>
-            ) : null}
+        <form onSubmit={saveProfile} noValidate className={`grid gap-4 ${FORM_WIDTH}`}>
+          <TextField
+            id="account-username"
+            label="Username"
+            minLength={3}
+            maxLength={50}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            error={profileFieldErrors.username}
+          />
+          <TextField
+            id="account-email"
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={profileFieldErrors.email}
+          />
+          <div>
+            <Button type="submit" disabled={savingProfile || !dirty}>
+              {savingProfile ? (
+                <>
+                  <Spinner />
+                  Saving
+                </>
+              ) : (
+                'Save changes'
+              )}
+            </Button>
           </div>
-
-          <div className="field">
-            <label htmlFor="account-email">Email</label>
-            <input
-              id="account-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              aria-invalid={Boolean(profileFieldErrors.email)}
-            />
-            {profileFieldErrors.email ? (
-              <span className="error">{profileFieldErrors.email}</span>
-            ) : null}
-          </div>
-
-          <button type="submit" className="btn" disabled={savingProfile || !dirty}>
-            {savingProfile ? <span className="spinner" /> : 'Save changes'}
-          </button>
         </form>
-      </div>
+      </Section>
 
-      <ApiKeysCard />
+      <ApiKeysSection />
 
-      <div className="card">
-        <div className="card-title">Password</div>
-        <p className="card-sub">
+      <Section title="Password">
+        <p className={`text-[13.5px] text-muted-foreground ${FORM_WIDTH}`}>
           Changing your password signs you out everywhere, including here.
         </p>
 
-        <Notice error={passwordError} />
+        <Notice error={passwordError} className="mt-4" />
 
-        <form onSubmit={savePassword} noValidate style={{ maxWidth: 420 }}>
-          <div className="field">
-            <label htmlFor="current-password">Current password</label>
-            <input
-              id="current-password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-            />
+        <form onSubmit={savePassword} noValidate className={`mt-4 grid gap-4 ${FORM_WIDTH}`}>
+          <TextField
+            id="current-password"
+            label="Current password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+          />
+          <TextField
+            id="new-password"
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            maxLength={128}
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            hint="At least 8 characters."
+          />
+          <TextField
+            id="confirm-password"
+            label="Confirm new password"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            error={mismatch ? 'The two passwords do not match.' : undefined}
+          />
+          <div>
+            <Button
+              type="submit"
+              disabled={savingPassword || !current || !next || !confirm || mismatch}
+            >
+              {savingPassword ? (
+                <>
+                  <Spinner />
+                  Changing
+                </>
+              ) : (
+                'Change password'
+              )}
+            </Button>
           </div>
-
-          <div className="field">
-            <label htmlFor="new-password">New password</label>
-            <input
-              id="new-password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              maxLength={128}
-              value={next}
-              onChange={(e) => setNext(e.target.value)}
-            />
-            <span className="hint">At least 8 characters.</span>
-          </div>
-
-          <div className="field">
-            <label htmlFor="confirm-password">Confirm new password</label>
-            <input
-              id="confirm-password"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              aria-invalid={mismatch}
-            />
-            {mismatch ? (
-              <span className="error">The two passwords do not match.</span>
-            ) : null}
-          </div>
-
-          <button
-            type="submit"
-            className="btn"
-            disabled={savingPassword || !current || !next || !confirm || mismatch}
-          >
-            {savingPassword ? <span className="spinner" /> : 'Change password'}
-          </button>
         </form>
-      </div>
+      </Section>
     </>
   )
 }
 
-function ApiKeysCard() {
+function ApiKeysSection() {
   const [settings, setSettings] = useState<ApiKeySettings | null>(null)
   const [key, setKey] = useState('')
   const [error, setError] = useState<unknown>(null)
@@ -241,60 +248,83 @@ function ApiKeysCard() {
   }
 
   return (
-    <div className="card">
-      <div className="card-title">API keys</div>
-      <p className="card-sub">
-        Core Web Vitals come from Google PageSpeed Insights, which needs your own
-        API key. It is free — 25,000 requests a day — and is stored encrypted.{' '}
-        <a href={PSI_KEY_DOCS} target="_blank" rel="noreferrer">
+    <Section title="API keys" meta="Stored encrypted">
+      <p className="max-w-[62ch] text-[13.5px] leading-relaxed text-muted-foreground">
+        Core Web Vitals come from Google PageSpeed Insights, which needs your own API
+        key. It is free, at 25,000 requests a day.{' '}
+        <a
+          href={PSI_KEY_DOCS}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 font-medium text-accent-on-tint underline-offset-4 hover:underline"
+        >
           How to get a key
+          <ExternalLink className="size-3.5" aria-hidden="true" />
         </a>
-        .
       </p>
 
-      <Notice error={error} />
+      <Notice error={error} className="mt-4" />
       {settings && !canStore ? (
-        <Notice tone="warning">
+        <Notice tone="warning" className="mt-4">
           This server cannot store API keys yet — the operator needs to set{' '}
-          <code>API_KEY_ENCRYPTION_KEY</code>. Keys are never stored unencrypted.
+          <code className="rounded bg-code px-1 py-0.5 font-mono text-[12px]">
+            API_KEY_ENCRYPTION_KEY
+          </code>
+          . Keys are never stored unencrypted.
         </Notice>
       ) : null}
       {psi?.last_error ? (
-        <Notice tone="warning">
+        <Notice tone="warning" className="mt-4">
           Google last rejected this key: {psi.last_error}
         </Notice>
       ) : null}
 
-      {psi?.configured ? (
-        <div className="field" style={{ maxWidth: 420 }}>
-          <span className="hint">
-            Key ending <strong>…{psi.key_hint}</strong> saved
+      {!settings && !error ? (
+        <Skeleton className="mt-4 h-10 max-w-[420px]" />
+      ) : psi?.configured ? (
+        <Panel className={`mt-4 ${FORM_WIDTH}`}>
+          <p className="text-[13.5px]">
+            Key ending{' '}
+            <strong className="font-mono font-semibold">…{psi.key_hint}</strong> saved
             {psi.last_used_at ? ` · last used ${formatDate(psi.last_used_at)}` : ''}
-          </span>
-          <button type="button" className="btn ghost" onClick={remove}>
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={remove}
+            className="mt-3.5"
+          >
             Remove key
-          </button>
-        </div>
+          </Button>
+        </Panel>
       ) : (
-        <form onSubmit={save} noValidate style={{ maxWidth: 420 }}>
-          <div className="field">
-            <label htmlFor="psi-key">PageSpeed Insights API key</label>
-            <input
-              id="psi-key"
-              type="password"
-              autoComplete="off"
-              placeholder="AIza…"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              disabled={!canStore}
-            />
-            <span className="hint">Checked with Google before it is saved.</span>
+        <form onSubmit={save} noValidate className={`mt-4 grid gap-4 ${FORM_WIDTH}`}>
+          <TextField
+            id="psi-key"
+            label="PageSpeed Insights API key"
+            type="password"
+            autoComplete="off"
+            placeholder="AIza…"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            disabled={!canStore}
+            hint="Checked with Google before it is saved."
+          />
+          <div>
+            <Button type="submit" disabled={saving || !key.trim() || !canStore}>
+              {saving ? (
+                <>
+                  <Spinner />
+                  Saving
+                </>
+              ) : (
+                'Save key'
+              )}
+            </Button>
           </div>
-          <button type="submit" className="btn" disabled={saving || !key.trim() || !canStore}>
-            {saving ? <span className="spinner" /> : 'Save key'}
-          </button>
         </form>
       )}
-    </div>
+    </Section>
   )
 }

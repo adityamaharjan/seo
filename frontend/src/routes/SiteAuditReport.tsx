@@ -6,13 +6,27 @@
  * is a template bug. So issues ranked by how many pages they affect lead the
  * page, and the per-page table sits underneath for drilling in.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ExternalLink } from 'lucide-react'
 import { siteAuditsApi } from '../api/endpoints'
 import type { SiteAuditDetail, SiteIssue } from '../api/types'
 import { Notice } from '../components/Notice'
-import { ScoreRing, scoreColor } from '../components/ScoreRing'
+import { ScoreRing, ScoreCell } from '../components/ScoreRing'
 import { StatusPill } from '../components/StatusPill'
+import { CategoryMeters, CountChip, ShareMeter } from '../components/Readouts'
+import { Finding, FindingDetail, FindingFix, FindingList } from '../components/Finding'
+import { BackLink, EmptyState, Section, Stat, StatGrid } from '../components/Page'
+import { CenterNote, FailedPanel, PendingPanel } from '../components/ReportStates'
+import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { categoryLabel, formatDate, formatMs, shortUrl } from '../lib/format'
 
 /** A crawl of 50 pages can run for minutes, so polling runs longer than a report's. */
@@ -74,24 +88,27 @@ export function SiteAuditReport() {
     }
   }, [id, reloadKey])
 
+  // Worst page first: the table is a queue of work, not a leaderboard.
+  const pagesWorstFirst = useMemo(() => {
+    if (!audit) return []
+    return [...audit.pages].sort(
+      (a, b) => (a.overall_score ?? -1) - (b.overall_score ?? -1),
+    )
+  }, [audit])
+
+  const back = <BackLink to="/site-audit">Back to site audits</BackLink>
+
   if (error) {
     return (
       <>
-        <Link to="/site-audit" className="back-link">
-          ← Back to site audits
-        </Link>
-        <Notice error={error} />
+        {back}
+        <Notice error={error} className="mt-4" />
       </>
     )
   }
 
   if (!audit) {
-    return (
-      <div className="center-note">
-        <span className="spinner" />
-        <span>Loading site audit…</span>
-      </div>
-    )
+    return <CenterNote>Loading site audit…</CenterNote>
   }
 
   const results = audit.results
@@ -99,136 +116,92 @@ export function SiteAuditReport() {
 
   return (
     <>
-      <Link to="/site-audit" className="back-link">
-        ← Back to site audits
-      </Link>
+      {back}
 
       {waiting ? (
-        <div className="card">
-          <div className="report-head">
-            <div className="meta">
-              <h1>{audit.domain || audit.start_url}</h1>
-              <div className="url">{audit.start_url}</div>
-              <div style={{ marginTop: 12 }}>
-                <StatusPill status={audit.status} />
-              </div>
-            </div>
-          </div>
-          {timedOut ? (
-            <Notice tone="warning">
-              <strong>Still crawling.</strong> This is taking longer than expected.
-              The worker may be busy or stopped.{' '}
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => setReloadKey((k) => k + 1)}
-              >
-                Check again
-              </button>
-            </Notice>
-          ) : (
-            <p className="card-sub" style={{ marginTop: 18, marginBottom: 0 }}>
-              <span className="spinner" /> Crawling up to {audit.max_pages} pages and
-              auditing each one. A large site can take a few minutes.
-            </p>
-          )}
-        </div>
+        <PendingPanel
+          title={audit.domain || audit.start_url}
+          url={audit.start_url}
+          status={audit.status}
+          timedOut={timedOut}
+          onRetry={() => setReloadKey((k) => k + 1)}
+          stalledNoun="Still crawling."
+        >
+          Crawling up to {audit.max_pages} pages and auditing each one. A large site
+          can take a few minutes.
+        </PendingPanel>
       ) : null}
 
       {audit.status === 'failed' ? (
-        <div className="card">
-          <div className="report-head">
-            <div className="meta">
-              <h1>Site audit failed</h1>
-              <div className="url">{audit.start_url}</div>
-              <div style={{ marginTop: 12 }}>
-                <StatusPill status={audit.status} />
-              </div>
-            </div>
-          </div>
-          <Notice tone="error">{audit.error || 'The site could not be crawled.'}</Notice>
-          <p className="card-sub" style={{ marginBottom: 0 }}>
-            Your daily quota unit was refunded, so this attempt cost you nothing.
-          </p>
-        </div>
+        <FailedPanel
+          title="Site audit failed"
+          url={audit.start_url}
+          status={audit.status}
+          error={audit.error}
+          fallback="The site could not be crawled."
+        />
       ) : null}
 
       {results && audit.status === 'done' ? (
-        <>
-          <div className="card">
-            <div className="report-head">
-              <ScoreRing score={results.overall_score} grade={results.overall_grade} />
-              <div className="meta">
-                <h1>{results.domain}</h1>
-                <div className="url">
-                  <a href={audit.start_url} target="_blank" rel="noreferrer nofollow">
-                    {audit.start_url}
-                  </a>
-                </div>
-                <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <StatusPill status={audit.status} />
-                  <span className="pill info">
-                    {results.pages_crawled} pages via {results.discovery_source}
-                  </span>
-                </div>
-                <div className="issue-summary">
-                  <span className="issue-stat critical">
-                    <span className="n">{results.issue_counts.critical}</span> critical
-                  </span>
-                  <span className="issue-stat warning">
-                    <span className="n">{results.issue_counts.warning}</span> warnings
-                  </span>
-                  <span className="issue-stat good">
-                    <span className="n">{results.issue_counts.good}</span> passed
-                  </span>
-                </div>
-                <div className="url" style={{ marginTop: 10 }}>
-                  Crawled {formatDate(results.generated_at)}
-                </div>
-              </div>
-            </div>
+        <div className="mt-6">
+          {/* Masthead: the average, the site it belongs to, and the counts. */}
+          <div className="flex flex-wrap items-start gap-x-8 gap-y-6">
+            <ScoreRing score={results.overall_score} grade={results.overall_grade} />
 
-            {results.pages_failed > 0 ? (
-              <Notice tone="warning">
-                <strong>
-                  {results.pages_failed} page{results.pages_failed === 1 ? '' : 's'} could
-                  not be fetched.
-                </strong>{' '}
-                They are excluded from the averages below and listed at the bottom.
-              </Notice>
-            ) : null}
+            <div className="min-w-[260px] flex-1">
+              <h1 className="text-[24px] leading-tight font-semibold tracking-[-0.03em] break-words">
+                {results.domain}
+              </h1>
+              <a
+                href={audit.start_url}
+                target="_blank"
+                rel="noreferrer nofollow"
+                className="mt-1.5 inline-flex items-center gap-1.5 text-[13.5px] break-all text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              >
+                {audit.start_url}
+                <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+              </a>
 
-            <div className="stat-grid">
-              <div className="stat">
-                <div className="label">Average score</div>
-                <div className="value">{results.overall_score}</div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <StatusPill status={audit.status} />
+                <Badge variant="info" className="font-medium">
+                  {results.pages_crawled} pages via {results.discovery_source}
+                </Badge>
               </div>
-              <div className="stat">
-                <div className="label">Best page</div>
-                <div className="value">{results.score_spread.max}</div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <CountChip
+                  tone="critical"
+                  count={results.issue_counts.critical}
+                  label="critical"
+                />
+                <CountChip
+                  tone="warning"
+                  count={results.issue_counts.warning}
+                  label={results.issue_counts.warning === 1 ? 'warning' : 'warnings'}
+                />
+                <CountChip tone="good" count={results.issue_counts.good} label="passed" />
               </div>
-              <div className="stat">
-                <div className="label">Median</div>
-                <div className="value">{results.score_spread.median}</div>
-              </div>
-              <div className="stat">
-                <div className="label">Worst page</div>
-                <div className="value">{results.score_spread.min}</div>
-              </div>
-              <div className="stat">
-                <div className="label">Pages crawled</div>
-                <div className="value">{results.pages_crawled}</div>
-              </div>
-              <div className="stat">
-                <div className="label">Failed</div>
-                <div className="value">{results.pages_failed}</div>
-              </div>
+
+              <p className="mt-3.5 text-[13px] text-muted-foreground">
+                Crawled {formatDate(results.generated_at)}
+              </p>
             </div>
           </div>
 
+          {results.pages_failed > 0 ? (
+            <Notice tone="warning" className="mt-6">
+              <strong className="font-semibold">
+                {results.pages_failed} page{results.pages_failed === 1 ? '' : 's'} could
+                not be fetched.
+              </strong>{' '}
+              They are excluded from the averages below and listed at the bottom.
+            </Notice>
+          ) : null}
+
           {results.capped_pages.length > 0 ? (
-            <Notice tone="warning">
-              <strong>
+            <Notice tone="warning" className="mt-3">
+              <strong className="font-semibold">
                 {results.capped_pages.length} page
                 {results.capped_pages.length === 1 ? '' : 's'} cannot be indexed.
               </strong>{' '}
@@ -238,173 +211,146 @@ export function SiteAuditReport() {
             </Notice>
           ) : null}
 
-          <div className="card">
-            <div className="section-head">
-              <h2>Issues across the site</h2>
-              <span className="quota-text">Ranked by pages affected</span>
-            </div>
+          <Section title="Spread across the crawl" headingId="spread">
+            <StatGrid className="lg:grid-cols-6">
+              <Stat label="Average score" value={results.overall_score} />
+              <Stat label="Best page" value={results.score_spread.max} />
+              <Stat label="Median" value={results.score_spread.median} />
+              <Stat label="Worst page" value={results.score_spread.min} />
+              <Stat label="Pages crawled" value={results.pages_crawled} />
+              <Stat label="Failed" value={results.pages_failed} />
+            </StatGrid>
+          </Section>
+
+          <Section
+            title="Issues across the site"
+            meta="Ranked by pages affected"
+            headingId="issues"
+          >
             {results.top_issues.length === 0 ? (
-              <div className="empty">No warnings or critical issues on any page.</div>
+              <EmptyState title="Nothing repeating">
+                No warnings or critical issues came back on any crawled page.
+              </EmptyState>
             ) : (
-              <div className="issue-list">
+              <FindingList>
                 {results.top_issues.map((issue) => (
                   <IssueRow key={issue.id} issue={issue} />
                 ))}
-              </div>
+              </FindingList>
             )}
-          </div>
+          </Section>
 
-          <div className="card">
-            <div className="section-head">
-              <h2>Category averages</h2>
-              <span className="quota-text">Across {results.pages_crawled} pages</span>
-            </div>
-            <div className="category-grid">
-              {results.category_scores.map((category) => (
-                <div className="category" key={category.category}>
-                  <div className="top">
-                    <span className="name">{categoryLabel(category.category)}</span>
-                    <span className="score" style={{ color: scoreColor(category.score) }}>
-                      {category.score}
-                    </span>
-                  </div>
-                  <div className="weight">
-                    Grade {category.grade} · weight {Math.round(category.weight * 100)}%
-                  </div>
-                  <div className="meter">
-                    <span
-                      style={{
-                        width: `${category.score}%`,
-                        background: scoreColor(category.score),
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Section
+            title="Category averages"
+            meta={`Across ${results.pages_crawled} pages`}
+            headingId="categories"
+          >
+            <CategoryMeters categories={results.category_scores} />
+          </Section>
 
-          <div className="card">
-            <div className="section-head">
-              <h2>Pages</h2>
-              <span className="quota-text">Worst first</span>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Page</th>
-                    <th className="right">Score</th>
-                    <th className="right">Critical</th>
-                    <th className="right">Warnings</th>
-                    <th className="right">Load</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...audit.pages]
-                    .sort(
-                      (a, b) =>
-                        (a.overall_score ?? -1) - (b.overall_score ?? -1),
-                    )
-                    .map((page) => (
-                      <tr key={page.id}>
-                        <td>
-                          <Link
-                            to={`/site-audit/${audit.id}/page/${page.id}`}
-                            className="cell-url"
-                          >
-                            <span className="primary">
-                              {page.title || shortUrl(page.final_url || page.url)}
-                            </span>
-                            <span className="secondary">
-                              {shortUrl(page.final_url || page.url)}
-                            </span>
-                          </Link>
-                        </td>
-                        <td className="right">
-                          {page.overall_score === null ? (
-                            <span className="pill critical">failed</span>
-                          ) : (
-                            <strong style={{ color: scoreColor(page.overall_score) }}>
-                              {page.overall_score}
-                              <span style={{ color: 'var(--muted)', fontWeight: 500 }}>
-                                {' '}
-                                {page.overall_grade}
-                              </span>
-                            </strong>
-                          )}
-                        </td>
-                        <td className="right">{page.issue_counts?.critical ?? '—'}</td>
-                        <td className="right">{page.issue_counts?.warning ?? '—'}</td>
-                        <td className="right" style={{ whiteSpace: 'nowrap' }}>
-                          {formatMs(page.load_time_ms)}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <Section title="Pages" meta="Worst first" headingId="pages">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Page</TableHead>
+                  <TableHead className="text-right">Score</TableHead>
+                  <TableHead className="text-right">Critical</TableHead>
+                  <TableHead className="text-right">Warnings</TableHead>
+                  <TableHead className="text-right">Load</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pagesWorstFirst.map((page) => (
+                  <TableRow key={page.id}>
+                    <TableCell className="max-w-[440px]">
+                      <Link
+                        to={`/site-audit/${audit.id}/page/${page.id}`}
+                        className="block min-w-0 rounded-sm"
+                      >
+                        <span className="block truncate font-medium">
+                          {page.title || shortUrl(page.final_url || page.url)}
+                        </span>
+                        <span className="block truncate text-[12.5px] text-muted-foreground">
+                          {shortUrl(page.final_url || page.url)}
+                        </span>
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {page.overall_score === null ? (
+                        <StatusPill status="failed" />
+                      ) : (
+                        <ScoreCell
+                          score={page.overall_score}
+                          grade={page.overall_grade}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {page.issue_counts?.critical ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {page.issue_counts?.warning ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap tabular-nums">
+                      {formatMs(page.load_time_ms)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Section>
 
           {results.errors.length > 0 ? (
-            <div className="card">
-              <div className="section-head">
-                <h2>Pages that could not be fetched</h2>
-              </div>
-              <div className="check-list">
+            <Section title="Pages that could not be fetched" headingId="errors">
+              <FindingList>
                 {results.errors.map((failure) => (
-                  <div className="check critical" key={failure.url}>
-                    <div className="bar" />
-                    <div className="body">
-                      <div className="head">
-                        <span className="label">{shortUrl(failure.url)}</span>
-                      </div>
-                      <div className="message">{failure.error || 'Fetch failed.'}</div>
-                    </div>
-                  </div>
+                  <Finding
+                    key={failure.url}
+                    status="critical"
+                    label={shortUrl(failure.url)}
+                    message={failure.error || 'Fetch failed.'}
+                  />
                 ))}
-              </div>
-            </div>
+              </FindingList>
+            </Section>
           ) : null}
-        </>
+        </div>
       ) : null}
     </>
   )
 }
 
+/** One problem, with how much of the site it touches. */
 function IssueRow({ issue }: { issue: SiteIssue }) {
   const share = issue.total_pages ? (issue.affected_pages / issue.total_pages) * 100 : 0
+  const tone = issue.status === 'critical' ? 'critical' : 'warning'
   return (
-    <div className={`check ${issue.status}`}>
-      <div className="bar" />
-      <div className="body">
-        <div className="head">
-          <span className="label">{issue.label}</span>
+    <Finding
+      status={issue.status}
+      label={issue.label}
+      badges={
+        <>
           <StatusPill status={issue.status} />
-          {issue.sitewide ? <span className="pill warning">site-wide</span> : null}
-        </div>
-        <div className="message">
+          {issue.sitewide ? <Badge variant="warning">site-wide</Badge> : null}
+        </>
+      }
+      message={
+        <>
           Affects {issue.affected_pages} of {issue.total_pages} pages in{' '}
           {categoryLabel(issue.category)}.
-        </div>
-        <div className="meter" style={{ margin: '8px 0' }}>
-          <span
-            style={{
-              width: `${share}%`,
-              background: issue.status === 'critical' ? 'var(--critical)' : 'var(--warning)',
-            }}
-          />
-        </div>
-        {issue.recommendation ? (
-          <div className="rec">
-            <b>Fix:</b> {issue.recommendation}
-          </div>
-        ) : null}
-        <div className="detail">
-          e.g. {issue.example_urls.slice(0, 3).map((u) => shortUrl(u, 40)).join(' · ')}
-        </div>
-      </div>
-      <div className="score">{issue.affected_pages}</div>
-    </div>
+        </>
+      }
+      trailing={issue.affected_pages}
+    >
+      <ShareMeter
+        share={share}
+        tone={tone}
+        ariaLabel={`Affects ${issue.affected_pages} of ${issue.total_pages} pages`}
+      />
+      {issue.recommendation ? <FindingFix>{issue.recommendation}</FindingFix> : null}
+      <FindingDetail>
+        e.g. {issue.example_urls.slice(0, 3).map((u) => shortUrl(u, 40)).join(' · ')}
+      </FindingDetail>
+    </Finding>
   )
 }

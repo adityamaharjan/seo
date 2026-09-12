@@ -2,7 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { Notice } from '../components/Notice'
+import { AuthShell } from '../components/AuthShell'
+import { TextField } from '../components/Field'
+import { Spinner } from '../components/Spinner'
 import { useAuth } from '../auth/AuthContext'
+import { Button } from '@/components/ui/button'
 
 export function Login() {
   const { user, loading, login } = useAuth()
@@ -36,57 +40,54 @@ export function Login() {
   }
 
   return (
-    <div className="auth-wrap">
-      <div className="auth-card">
-        <div className="auth-head">
-          <div className="brand">
-            <span className="dot" />
-            SEO Analysis
-          </div>
-          <p>Sign in to analyze a page.</p>
-        </div>
-
-        <div className="card">
-          <Notice error={error} />
-          <form onSubmit={handleSubmit} noValidate>
-            <div className="field">
-              <label htmlFor="email">Email</label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                aria-invalid={Boolean(fieldErrors.email)}
-              />
-              {fieldErrors.email ? <span className="error">{fieldErrors.email}</span> : null}
-            </div>
-
-            <div className="field">
-              <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                aria-invalid={Boolean(fieldErrors.password)}
-              />
-              {fieldErrors.password ? <span className="error">{fieldErrors.password}</span> : null}
-            </div>
-
-            <button type="submit" className="btn block" disabled={busy}>
-              {busy ? <span className="spinner" /> : 'Sign in'}
-            </button>
-          </form>
-        </div>
-
-        <p className="auth-alt">
-          No account yet? <Link to="/signup">Create one</Link>
-        </p>
-      </div>
-    </div>
+    <AuthShell
+      title="Sign in"
+      lede="Pick up where you left off."
+      footer={
+        <>
+          No account yet?{' '}
+          <Link
+            to="/signup"
+            className="font-medium text-accent-on-tint underline-offset-4 hover:underline"
+          >
+            Create one
+          </Link>
+        </>
+      }
+    >
+      <Notice error={error} className="mb-4" />
+      <form onSubmit={handleSubmit} noValidate className="grid gap-4">
+        <TextField
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={fieldErrors.email}
+        />
+        <TextField
+          id="password"
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={fieldErrors.password}
+        />
+        <Button type="submit" disabled={busy} className="mt-1 h-10 w-full">
+          {busy ? (
+            <>
+              <Spinner />
+              Signing in
+            </>
+          ) : (
+            'Sign in'
+          )}
+        </Button>
+      </form>
+    </AuthShell>
   )
 }

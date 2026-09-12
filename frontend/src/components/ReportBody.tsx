@@ -5,8 +5,16 @@
  * Shared by the single-page report and by one page inside a site audit. Both
  * carry the identical `SeoResult` payload, so the site audit gets the full
  * report view for free rather than a second, thinner rendering of the same data.
+ *
+ * The redesign is mostly about what leads. A report is read to answer "what do
+ * I fix first", so the score, the three counts and the route into the failing
+ * checks are the masthead, and everything that merely describes the fetch has
+ * moved below a rule. Category scores became a list of meters rather than a
+ * grid of eight boxes: they are eight readings on one scale, and a list lets
+ * them be compared down a column instead of hunted around a grid.
  */
 import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { ExternalLink } from 'lucide-react'
 import type {
   CheckResult,
   CheckStatus,
@@ -14,9 +22,14 @@ import type {
   SeoResult,
 } from '../api/types'
 import { Notice } from './Notice'
-import { ScoreRing, scoreColor } from './ScoreRing'
+import { ScoreRing, scoreColor, scoreTextClass } from './ScoreRing'
+import { CategoryMeters, CountChip } from './Readouts'
 import { StatusPill } from './StatusPill'
+import { Finding, FindingDetail, FindingFix, FindingList } from './Finding'
+import { EmptyState, Section, Stat, StatGrid } from './Page'
+import { Badge } from '@/components/ui/badge'
 import { categoryLabel, formatDate, formatKb, formatMs, renderValue } from '../lib/format'
+import { cn } from '@/lib/utils'
 
 const STATUS_ORDER: CheckStatus[] = ['critical', 'warning', 'good', 'info']
 
@@ -90,168 +103,178 @@ export function ReportBody({ results, targetKeywords, badge }: Props) {
 
   return (
     <>
-      <div className="card">
-        <div className="report-head">
-          <ScoreRing score={results.overall_score} grade={results.overall_grade} />
-          <div className="meta">
-            <h1>{results.title || results.domain}</h1>
-            <div className="url">
-              <a href={results.final_url} target="_blank" rel="noreferrer nofollow">
-                {results.final_url}
-              </a>
-            </div>
-            <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {/* Masthead: the score, what it is a score of, and the way into the fixes. */}
+      <div className="flex flex-wrap items-start gap-x-8 gap-y-6">
+        <ScoreRing score={results.overall_score} grade={results.overall_grade} />
+
+        <div className="min-w-[260px] flex-1">
+          <h1 className="text-[24px] leading-tight font-semibold tracking-[-0.03em] break-words text-balance">
+            {results.title || results.domain}
+          </h1>
+          <a
+            href={results.final_url}
+            target="_blank"
+            rel="noreferrer nofollow"
+            className="mt-1.5 inline-flex items-center gap-1.5 text-[13.5px] break-all text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
+            {results.final_url}
+            <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+          </a>
+
+          {badge || (targetKeywords ?? []).length > 0 ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {badge}
               {(targetKeywords ?? []).map((keyword) => (
-                <span className="pill info" key={keyword}>
+                <Badge variant="info" key={keyword} className="font-medium">
                   {keyword}
-                </span>
+                </Badge>
               ))}
             </div>
-            <div className="issue-summary">
-              <button
-                type="button"
-                className="issue-stat critical"
-                onClick={() => focusChecks('critical')}
-                disabled={counts.critical === 0}
-              >
-                <span className="n">{counts.critical}</span> critical
-              </button>
-              <button
-                type="button"
-                className="issue-stat warning"
-                onClick={() => focusChecks('warning')}
-                disabled={counts.warning === 0}
-              >
-                <span className="n">{counts.warning}</span>{' '}
-                {counts.warning === 1 ? 'warning' : 'warnings'}
-              </button>
-              <span className="issue-stat good">
-                <span className="n">{counts.good}</span> passed
-              </span>
-            </div>
-            <div className="url" style={{ marginTop: 10 }}>
-              Analyzed {formatDate(results.generated_at)}
-            </div>
-          </div>
-        </div>
+          ) : null}
 
-        {capReasons.length > 0 ? (
-          <Notice tone="warning">
-            <strong>Score capped at {results.overall_score}.</strong>{' '}
-            {capReasons.join(' ')}
-            {results.uncapped_score === undefined
-              ? null
-              : ` Fixing that alone would take this page to ${results.uncapped_score}.`}
-          </Notice>
-        ) : null}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <CountChip
+              tone="critical"
+              count={counts.critical}
+              label="critical"
+              onSelect={() => focusChecks('critical')}
+            />
+            <CountChip
+              tone="warning"
+              count={counts.warning}
+              label={counts.warning === 1 ? 'warning' : 'warnings'}
+              onSelect={() => focusChecks('warning')}
+            />
+            <CountChip tone="good" count={counts.good} label="passed" />
+          </div>
 
-        <div className="stat-grid">
-          <div className="stat">
-            <div className="label">TTFB</div>
-            <div className="value">{formatMs(results.timing.ttfb_ms)}</div>
-          </div>
-          <div className="stat">
-            <div className="label">Load time</div>
-            <div className="value">{formatMs(results.timing.load_time_ms)}</div>
-          </div>
-          <div className="stat">
-            <div className="label">Page size</div>
-            <div className="value">{formatKb(results.timing.html_size_kb)}</div>
-          </div>
-          <div className="stat">
-            <div className="label">Transferred</div>
-            <div className="value">{formatKb(results.timing.transfer_size_kb)}</div>
-          </div>
-          <div className="stat">
-            <div className="label">HTTP</div>
-            <div className="value">{results.status_code ?? '—'}</div>
-          </div>
-          <div className="stat">
-            <div className="label">Redirects</div>
-            <div className="value">{results.timing.redirect_count}</div>
-          </div>
-          <div className="stat">
-            <div className="label">Compressed</div>
-            <div className="value">{results.timing.compressed ? 'Yes' : 'No'}</div>
-          </div>
+          <p className="mt-3.5 text-[13px] text-muted-foreground">
+            Analyzed {formatDate(results.generated_at)}
+          </p>
         </div>
       </div>
 
-      {keywords ? <KeywordReportCard report={keywords} /> : null}
+      {capReasons.length > 0 ? (
+        <Notice tone="warning" className="mt-6">
+          <strong className="font-semibold">
+            Score capped at {results.overall_score}.
+          </strong>{' '}
+          {capReasons.join(' ')}
+          {results.uncapped_score === undefined
+            ? null
+            : ` Fixing that alone would take this page to ${results.uncapped_score}.`}
+        </Notice>
+      ) : null}
 
-      <div className="card">
-        <div className="section-head">
-          <h2>Category scores</h2>
-          <span className="quota-text">Weighted into the overall score</span>
-        </div>
-        <div className="category-grid">
-          {results.category_scores.map((category) => (
-            <div className="category" key={category.category}>
-              <div className="top">
-                <span className="name">{categoryLabel(category.category)}</span>
-                <span className="score" style={{ color: scoreColor(category.score) }}>
-                  {category.score}
-                </span>
-              </div>
-              <div className="weight">
-                Grade {category.grade} · weight {Math.round(category.weight * 100)}%
-              </div>
-              <div className="meter">
-                <span
-                  style={{
-                    width: `${category.score}%`,
-                    background: scoreColor(category.score),
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <Section title="How the page was served" headingId="fetch">
+        <StatGrid>
+          <Stat label="TTFB" value={formatMs(results.timing.ttfb_ms)} />
+          <Stat label="Load time" value={formatMs(results.timing.load_time_ms)} />
+          <Stat label="Page size" value={formatKb(results.timing.html_size_kb)} />
+          <Stat label="Transferred" value={formatKb(results.timing.transfer_size_kb)} />
+          <Stat label="HTTP" value={results.status_code ?? '—'} />
+          <Stat label="Redirects" value={results.timing.redirect_count} />
+          <Stat label="Compressed" value={results.timing.compressed ? 'Yes' : 'No'} />
+        </StatGrid>
+      </Section>
 
-      <div className="card" ref={checksRef}>
-        <div className="section-head">
-          <h2>Checks</h2>
-        </div>
+      {keywords ? <KeywordSection report={keywords} /> : null}
 
-        <div className="filters">
-          <button
-            type="button"
-            className={`filter${filter === 'all' ? ' on' : ''}`}
-            onClick={() => setFilter('all')}
+      <Section
+        title="Category scores"
+        meta="Weighted into the overall score"
+        headingId="categories"
+      >
+        <CategoryMeters categories={results.category_scores} />
+      </Section>
+
+      <div ref={checksRef} className="scroll-mt-[calc(var(--header-h)+16px)]">
+        <Section
+          title="Checks"
+          meta={`${results.checks.length} run against this page`}
+          headingId="checks"
+        >
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Filter checks by status"
           >
-            All <span className="count">{counts.all}</span>
-          </button>
-          {STATUS_ORDER.map((status) => (
-            <button
-              key={status}
-              type="button"
-              className={`filter${filter === status ? ' on' : ''}`}
-              onClick={() => setFilter(status)}
-              disabled={counts[status] === 0}
-            >
-              {status} <span className="count">{counts[status]}</span>
-            </button>
-          ))}
-        </div>
+            <FilterChip
+              active={filter === 'all'}
+              count={counts.all}
+              label="All"
+              onSelect={() => setFilter('all')}
+            />
+            {STATUS_ORDER.map((status) => (
+              <FilterChip
+                key={status}
+                active={filter === status}
+                count={counts[status]}
+                label={status}
+                disabled={counts[status] === 0}
+                onSelect={() => setFilter(status)}
+              />
+            ))}
+          </div>
 
-        {grouped.length === 0 ? (
-          <div className="empty">Nothing matches that filter.</div>
-        ) : (
-          grouped.map(([category, checks]) => (
-            <div className="check-group" key={category}>
-              <h3>{categoryLabel(category)}</h3>
-              <div className="check-list">
-                {checks.map((check) => (
-                  <CheckRow key={check.id} check={check} />
-                ))}
-              </div>
-            </div>
-          ))
-        )}
+          <div className="mt-6 space-y-9">
+            {grouped.length === 0 ? (
+              <EmptyState title="Nothing matches that filter">
+                No checks came back with that status. Pick another one above.
+              </EmptyState>
+            ) : (
+              grouped.map(([category, checks]) => (
+                <div key={category}>
+                  <h3 className="mb-2.5 text-[11px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">
+                    {categoryLabel(category)}
+                  </h3>
+                  <FindingList>
+                    {checks.map((check) => (
+                      <CheckRow key={check.id} check={check} />
+                    ))}
+                  </FindingList>
+                </div>
+              ))
+            )}
+          </div>
+        </Section>
       </div>
     </>
+  )
+}
+
+/** A status filter above the check list. */
+function FilterChip({
+  active,
+  count,
+  label,
+  disabled,
+  onSelect,
+}: {
+  active: boolean
+  count: number
+  label: string
+  disabled?: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      aria-pressed={active}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] capitalize transition-colors',
+        active
+          ? 'border-primary/40 bg-accent-soft font-medium text-accent-on-tint'
+          : 'border-border-strong text-muted-foreground enabled:hover:bg-surface enabled:hover:text-foreground',
+        'disabled:opacity-45',
+        !disabled && 'cursor-pointer',
+      )}
+    >
+      {label}
+      <span className="tabular-nums opacity-70">{count}</span>
+    </button>
   )
 }
 
@@ -266,7 +289,7 @@ const FALLBACK_PLACEMENTS: Record<string, string> = {
   image_alt: 'Image alt',
 }
 
-function KeywordReportCard({ report }: { report: KeywordReport }) {
+function KeywordSection({ report }: { report: KeywordReport }) {
   const slots = Object.keys(report.placement_weights).length
     ? Object.keys(report.placement_weights)
     : Object.keys(FALLBACK_PLACEMENTS)
@@ -274,43 +297,67 @@ function KeywordReportCard({ report }: { report: KeywordReport }) {
     report.placement_labels[slot] ?? FALLBACK_PLACEMENTS[slot] ?? slot
 
   return (
-    <div className="card">
-      <div className="section-head">
-        <h2>Keyword targeting</h2>
-        <span className="quota-text">Scored separately from the page score</span>
-      </div>
-      <p className="card-sub">
+    <Section
+      title="Keyword targeting"
+      meta="Scored separately from the page score"
+      headingId="keywords"
+    >
+      <p className="max-w-[70ch] text-[14px] leading-relaxed text-muted-foreground">
         {report.message} Placement is what this measures, so it does not change the
         page score above.
       </p>
 
-      <div className="keyword-list">
+      {/*
+        One legend for the whole card. The placement chips below are coloured
+        and struck through to say the same thing, but the vocabulary is specific
+        enough to this tool that naming it once is worth the four lines.
+      */}
+      <ul className="mt-4 flex list-none flex-wrap gap-x-5 gap-y-1.5 p-0 text-[12px] text-muted-foreground">
+        <LegendKey className="bg-good-soft text-good">Exact phrase</LegendKey>
+        <LegendKey className="bg-warn-soft text-warn">Close variant</LegendKey>
+        <LegendKey className="bg-surface-2 text-muted-foreground line-through">
+          Not found
+        </LegendKey>
+        <LegendKey className="border border-border text-muted-foreground opacity-60">
+          No such element
+        </LegendKey>
+      </ul>
+
+      <div className="mt-5 grid gap-3">
         {report.keywords.map((result) => (
-          <div className="keyword-row" key={result.keyword}>
-            <div className="keyword-head">
-              <span className="keyword-name">{result.keyword}</span>
-              <span className="keyword-score" style={{ color: scoreColor(result.score) }}>
+          <div
+            key={result.keyword}
+            className="rounded-xl border border-border px-4 py-3.5"
+          >
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="font-semibold break-words">{result.keyword}</span>
+              <span
+                className={cn(
+                  'text-[17px] font-semibold tabular-nums tracking-[-0.02em]',
+                  scoreTextClass(result.score),
+                )}
+              >
                 {result.score}
               </span>
             </div>
 
-            <div className="placement-grid">
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
               {slots.map((slot) => {
                 const match = result.found_in[slot]
                 const absent = result.not_applicable?.includes(slot)
                 return (
                   <span
                     key={slot}
-                    className={`placement ${absent ? 'na' : (match ?? 'missing')}`}
-                    title={
+                    className={cn(
+                      'rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold',
                       absent
-                        ? 'This page has no such element, so it is not counted'
+                        ? 'border border-border text-muted-foreground opacity-60'
                         : match === 'exact'
-                          ? 'Exact phrase'
+                          ? 'bg-good-soft text-good'
                           : match === 'partial'
-                            ? 'Close variant'
-                            : 'Not found'
-                    }
+                            ? 'bg-warn-soft text-warn'
+                            : 'bg-surface-2 text-muted-foreground line-through',
+                    )}
                   >
                     {label(slot)}
                   </span>
@@ -318,42 +365,58 @@ function KeywordReportCard({ report }: { report: KeywordReport }) {
               })}
             </div>
 
-            <div className="url">
-              Density {result.density_pct}%
+            <p className="mt-2.5 text-[13px] text-muted-foreground">
+              Density <span className="tabular-nums">{result.density_pct}%</span>
               {result.over_used ? ' · repeated too often' : ''}
-            </div>
+            </p>
           </div>
         ))}
       </div>
 
       {report.recommendation ? (
-        <div className="rec" style={{ marginTop: 14 }}>
-          <b>Fix:</b> {report.recommendation}
+        <div className="mt-4">
+          <FindingFix>{report.recommendation}</FindingFix>
         </div>
       ) : null}
-    </div>
+    </Section>
+  )
+}
+
+function LegendKey({
+  className,
+  children,
+}: {
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <li className="flex items-center gap-1.5">
+      <span
+        aria-hidden="true"
+        className={cn('rounded-full px-1.5 py-px text-[10px] font-semibold', className)}
+      >
+        Aa
+      </span>
+      {children}
+    </li>
   )
 }
 
 function CheckRow({ check }: { check: CheckResult }) {
   const detail = renderValue(check.value)
   return (
-    <div className={`check ${check.status}`}>
-      <div className="bar" />
-      <div className="body">
-        <div className="head">
-          <span className="label">{check.label}</span>
-          <StatusPill status={check.status} />
-        </div>
-        <div className="message">{check.message}</div>
-        {detail ? <div className="detail">{detail}</div> : null}
-        {check.recommendation ? (
-          <div className="rec">
-            <b>Fix:</b> {check.recommendation}
-          </div>
-        ) : null}
-      </div>
-      <div className="score">{check.status === 'info' ? '—' : check.score}</div>
-    </div>
+    <Finding
+      status={check.status}
+      label={check.label}
+      badges={<StatusPill status={check.status} />}
+      message={check.message}
+      trailing={check.status === 'info' ? '—' : check.score}
+    >
+      {detail ? <FindingDetail>{detail}</FindingDetail> : null}
+      {check.recommendation ? <FindingFix>{check.recommendation}</FindingFix> : null}
+    </Finding>
   )
 }
+
+/** Re-exported so views that show a single score can match the report's palette. */
+export { scoreColor }

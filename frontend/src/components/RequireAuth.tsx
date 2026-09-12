@@ -1,18 +1,14 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { CenterNote } from './ReportStates'
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
   const location = useLocation()
 
   if (loading) {
-    return (
-      <div className="center-note">
-        <span className="spinner" />
-        <span>Restoring your session…</span>
-      </div>
-    )
+    return <CenterNote>Restoring your session…</CenterNote>
   }
   if (!user) {
     // Remember where they were headed so sign-in can send them back.

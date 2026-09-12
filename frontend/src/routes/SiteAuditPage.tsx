@@ -5,11 +5,13 @@
  * reuses ReportBody rather than showing a reduced version of the same analysis.
  */
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { siteAuditsApi } from '../api/endpoints'
 import type { SiteAuditPageDetail } from '../api/types'
 import { Notice } from '../components/Notice'
 import { ReportBody } from '../components/ReportBody'
+import { BackLink, Panel } from '../components/Page'
+import { CenterNote } from '../components/ReportStates'
 
 export function SiteAuditPage() {
   const params = useParams<{ auditId: string; pageId: string }>()
@@ -38,43 +40,36 @@ export function SiteAuditPage() {
     }
   }, [auditId, pageId])
 
-  const back = (
-    <Link to={`/site-audit/${auditId}`} className="back-link">
-      ← Back to site audit
-    </Link>
-  )
+  const back = <BackLink to={`/site-audit/${auditId}`}>Back to site audit</BackLink>
 
   if (error) {
     return (
       <>
         {back}
-        <Notice error={error} />
+        <Notice error={error} className="mt-4" />
       </>
     )
   }
 
   if (!page) {
-    return (
-      <div className="center-note">
-        <span className="spinner" />
-        <span>Loading page…</span>
-      </div>
-    )
+    return <CenterNote>Loading page…</CenterNote>
   }
 
   if (!page.results?.fetched_ok) {
     return (
       <>
         {back}
-        <div className="card">
-          <div className="report-head">
-            <div className="meta">
-              <h1>This page could not be analyzed</h1>
-              <div className="url">{page.url}</div>
-            </div>
-          </div>
-          <Notice tone="error">{page.error || 'The page could not be fetched.'}</Notice>
-        </div>
+        <Panel className="mt-6">
+          <h1 className="text-[22px] leading-tight font-semibold tracking-[-0.025em]">
+            This page could not be analyzed
+          </h1>
+          <p className="mt-1.5 text-[13.5px] break-all text-muted-foreground">
+            {page.url}
+          </p>
+          <Notice tone="error" className="mt-5">
+            {page.error || 'The page could not be fetched.'}
+          </Notice>
+        </Panel>
       </>
     )
   }
@@ -82,7 +77,9 @@ export function SiteAuditPage() {
   return (
     <>
       {back}
-      <ReportBody results={page.results} />
+      <div className="mt-6">
+        <ReportBody results={page.results} />
+      </div>
     </>
   )
 }

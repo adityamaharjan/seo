@@ -1,20 +1,104 @@
 /**
- * Tailwind entry for the shadcn/ui components on the landing page.
+ * The app's only stylesheet.
  *
- * Preflight is deliberately NOT imported. Tailwind's base reset would strip the
- * element styling that `styles.css` and every existing app view depend on, so
- * only the theme and the utility layer are pulled in. Tailwind here is additive:
- * it styles the landing page without touching anything already built.
+ * Everything visual is Tailwind utilities on shadcn/ui primitives. What lives
+ * here is the part utilities cannot express: the design tokens, the mapping
+ * from those tokens onto the names shadcn components expect, and the handful of
+ * keyframes and motion primitives the views compose with.
+ *
+ * Preflight IS imported. An earlier revision deliberately left it out because a
+ * hand-written stylesheet full of element rules (`a { color }`, `h1 { weight }`,
+ * `table { ... }`) sat underneath every view and the reset would have stripped
+ * it. Those rules are gone now that the views are utility-styled, so the reset
+ * is back and Tailwind behaves the way its documentation says it does. The
+ * `.landing` escape hatches that used to undo the element rules went with them.
  */
-@layer theme, base, components, utilities;
-@import 'tailwindcss/theme.css' layer(theme);
-@import 'tailwindcss/utilities.css' layer(utilities);
+@import 'tailwindcss';
 
 /*
- * shadcn's tokens are mapped onto the design tokens this product already has,
- * rather than given their own values. That keeps one source of truth for the
- * palette: the existing light/dark definitions in styles.css swap under
- * `prefers-color-scheme`, and these follow automatically.
+ * Palette.
+ *
+ * The text colours here are carried over unchanged from the previous design and
+ * the contrast reasoning with them, because that reasoning was measured rather
+ * than guessed and a redesign is no reason to re-open it. Surfaces, borders and
+ * radii are the parts that moved.
+ */
+:root {
+  --bg: #ffffff;
+  --surface: #fafafa;
+  --surface-2: #f4f4f5;
+  --fg: #1d1d1f;
+  --muted: #6e6e73;
+  --border: #e9e9ec;
+  --border-strong: #dcdce1;
+  /* Form-control boundaries must clear 3:1 against the page (WCAG 1.4.11).
+     --border-strong is a decorative hairline at 1.3:1 and cannot carry that. */
+  --border-control: #8e8e93;
+  --code-bg: #f6f6f8;
+
+  --accent: #5b5bf6;
+  --accent-hover: #4a4ae8;
+  --accent-soft: rgba(91, 91, 246, 0.1);
+  /* Accent text sitting ON the accent tint. The tint darkens the ground just
+     enough that --accent itself lands at 4.3:1, under the 4.5 minimum. */
+  --accent-on-tint: #4a4ae8;
+  --accent-fg: #ffffff;
+
+  --good: #2f9e44;
+  --good-soft: rgba(47, 158, 68, 0.12);
+  --warning: #b87f00;  /* 3.46:1 on white; the old #c68a04 sat at 2.98:1 */
+  --warning-soft: rgba(198, 138, 4, 0.14);
+  --critical: #e03131;
+  --critical-soft: rgba(224, 49, 49, 0.12);
+  --info: #4a7dc9;
+  --info-soft: rgba(74, 125, 201, 0.12);
+
+  --radius: 10px;
+  --header-h: 56px;
+  /* Wide enough for a seven-column table to breathe without the prose in the
+     report growing past a comfortable measure, which the views cap separately. */
+  --measure: 1180px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.04);
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.1);
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0b0e;
+    --surface: #141417;
+    --surface-2: #1c1c21;
+    --fg: #ededef;
+    --muted: #9a9aa3;
+    --border: #232329;
+    --border-strong: #2f2f37;
+    --border-control: #5f5f65;
+    --code-bg: #16161b;
+
+    --accent: #8b8bfb;
+    --accent-hover: #9c9cfc;
+    --accent-soft: rgba(139, 139, 251, 0.14);
+    --accent-on-tint: #8b8bfb;  /* already 5.6:1 on the dark tint */
+    --accent-fg: #11111a;
+
+    --good: #51cf66;
+    --good-soft: rgba(81, 207, 102, 0.14);
+    --warning: #ffd43b;
+    --warning-soft: rgba(255, 212, 59, 0.14);
+    --critical: #ff6b6b;
+    --critical-soft: rgba(255, 107, 107, 0.14);
+    --info: #74a9f2;
+    --info-soft: rgba(116, 169, 242, 0.14);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+    --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.45);
+  }
+}
+
+/*
+ * shadcn's token names are mapped onto the palette above rather than given
+ * their own values, so the light/dark swap has exactly one definition.
  */
 @theme inline {
   --color-background: var(--bg);
@@ -40,66 +124,80 @@
   --color-input: var(--border-control);
   --color-ring: var(--accent);
 
+  /* Status, used only to mean status. Never decoration. */
   --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
   --color-warn: var(--warning);
+  --color-warn-soft: var(--warning-soft);
   --color-crit: var(--critical);
+  --color-crit-soft: var(--critical-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-code: var(--code-bg);
   --color-accent-soft: var(--accent-soft);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: var(--radius-lg);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
 
   --font-sans: var(--sans);
   --font-mono: var(--mono);
 }
 
-/* Accordion open/close, which Radix drives with CSS custom properties. */
-@keyframes accordion-down {
-  from { height: 0; }
-  to { height: var(--radix-accordion-content-height); }
-}
-@keyframes accordion-up {
-  from { height: var(--radix-accordion-content-height); }
-  to { height: 0; }
-}
-
-/*
- * Without Tailwind's preflight the global element rules in styles.css still
- * apply, and two of them fight the utilities on the landing page: anchors get
- * an accent colour and a hover underline, and headings carry a fixed weight and
- * letter-spacing. Neutralising them inside `.landing` only lets Tailwind take
- * over there while every existing app view keeps the styling it was built with.
- * `.landing a:hover` outranks the global `a:hover`, which a utility class alone
- * would not.
- */
 @layer base {
-  .landing a,
-  .landing a:hover {
-    color: inherit;
-    text-decoration: none;
+  /*
+   * Tailwind v4 defaults an un-suffixed `border` to currentColor, which turns
+   * every hairline into whatever the text happens to be. Anchoring it to the
+   * token means `border` alone is already the right colour.
+   */
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-border);
   }
-  .landing :is(h1, h2, h3, h4) {
-    font-weight: inherit;
-    letter-spacing: inherit;
-    line-height: inherit;
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+  }
+
+  /*
+   * Anything focused by keyboard gets a visible ring, including elements that
+   * never opted into one. Components that draw their own override this.
+   */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }
 
-/*
- * Scroll reveal.
- *
- * Elements start slightly low and transparent, then settle when they enter the
- * viewport. The distance is deliberately small: at 14px it reads as the page
- * composing itself, where a larger travel reads as a slideshow. Easing is a
- * decelerate curve so motion arrives rather than stops.
- *
- * Anyone who has asked their system to reduce motion gets the finished state
- * immediately, with no transition at all.
- */
 @layer components {
+  /*
+   * Scroll reveal.
+   *
+   * Elements start slightly low and transparent, then settle when they enter
+   * the viewport. The distance is deliberately small: at 14px it reads as the
+   * page composing itself, where a larger travel reads as a slideshow. Easing
+   * is a decelerate curve so motion arrives rather than stops.
+   */
   .reveal {
     opacity: 0;
     transform: translateY(14px);
@@ -137,7 +235,43 @@
   }
 }
 
+/* Radix drives the accordion and every overlay with CSS custom properties. */
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes content-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A status dot on work that is still running. */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* The sweep across a loading placeholder. */
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   .reveal,
   .rule,
   .lift {

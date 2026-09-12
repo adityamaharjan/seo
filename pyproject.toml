@@ -1,27 +1,36 @@
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
-filterwarnings = ["ignore::DeprecationWarning"]
-
-[tool.coverage.run]
-source = ["app"]
-omit = ["app/api/docs_pages.py"]  # rendered HTML, exercised by eye not by tests
-
-[tool.coverage.report]
-skip_covered = false
-exclude_lines = [
-    "pragma: no cover",
-    "if TYPE_CHECKING:",
-    "raise NotImplementedError",
+[project]
+name = "seo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi==0.125.0",
+    "uvicorn[standard]==0.38.0",
+    "python-multipart==0.0.20",
+    "pydantic-settings==2.7.0",
+    "email-validator==2.3.0",
+    "asyncmy==0.2.10",
+    "PyMySQL==1.1.2",
+    "alembic==1.14.0",
+    "PyJWT==2.10.1",
+    "bcrypt==5.0.0",
+    "cryptography==50.0.1",
+    "arq==0.26.3",
+    "httpx[http2]==0.28.1",
+    "brotli==1.2.0",
+    "zstandard==0.25.0",
+    "beautifulsoup4==4.14.3",
+    "lxml==5.3.0",
+    "Markdown==3.7",
 ]
 
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
-ignore = ["B008"]  # FastAPI uses function calls (Depends) in argument defaults
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E501"]  # inline HTML test fixtures may exceed the line length
+[dependency-groups]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.25.2",
+    "pytest-cov==6.0.0",
+    "respx==0.22.0",
+    "aiosqlite==0.20.0",
+    "ruff==0.9.2",
+]

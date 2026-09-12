@@ -4,15 +4,37 @@
  * The sibling feature is the site audit, which crawls many pages and takes no
  * keywords. Keeping them apart is deliberate: keyword targeting depends on what
  * the submitter typed, and only makes sense aimed at one specific page.
+ *
+ * The submit form used to put the URL, the keywords and the button on one line,
+ * which left no room for either field to be labelled and made the optional one
+ * look as required as the URL. It is two rows now: the thing you must give, and
+ * the thing you may.
  */
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { FileSearch, Search, Trash2 } from 'lucide-react'
 import { analysesApi, quotaApi } from '../api/endpoints'
 import type { Paginated, Quota, ReportSummary } from '../api/types'
 import { Notice } from '../components/Notice'
 import { QuotaBar } from '../components/QuotaBar'
 import { StatusPill } from '../components/StatusPill'
-import { scoreColor } from '../components/ScoreRing'
+import { ScoreCell } from '../components/ScoreRing'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { Pager } from '../components/Pager'
+import { EmptyState, PageHeader, Panel, Section, TableSkeleton } from '../components/Page'
+import { Spinner } from '../components/Spinner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { formatDate, shortUrl } from '../lib/format'
 
 const PAGE_SIZE = 10
@@ -47,6 +69,7 @@ export function PageAudit() {
   const [page, setPage] = useState(1)
   const [listError, setListError] = useState<unknown>(null)
   const [loadingList, setLoadingList] = useState(true)
+  const [pendingDelete, setPendingDelete] = useState<ReportSummary | null>(null)
 
   const loadQuota = useCallback(() => {
     quotaApi
@@ -100,10 +123,12 @@ export function PageAudit() {
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!window.confirm('Delete this report? This cannot be undone.')) return
+  async function confirmDelete() {
+    const target = pendingDelete
+    setPendingDelete(null)
+    if (!target) return
     try {
-      await analysesApi.remove(id)
+      await analysesApi.remove(target.id)
       loadHistory(page)
     } catch (caught) {
       setListError(caught)
@@ -115,175 +140,200 @@ export function PageAudit() {
 
   return (
     <>
-      <div className="card">
-        <div className="card-title">Audit a single page</div>
-        <p className="card-sub">
-          Enter any public URL. The report covers meta, content, structure, links,
-          indexability, performance, security and mobile. Name up to{' '}
-          {MAX_TARGET_KEYWORDS} keywords to also see where each one appears on the
-          page, scored separately so it never moves the page score. Auditing a
-          whole site instead? <Link to="/site-audit">Run a site audit</Link>.
-        </p>
+      <PageHeader
+        title="Page audit"
+        description={
+          <>
+            Every check against a single URL, covering meta, content, structure,
+            links, indexability, performance, security and mobile. Auditing a whole
+            site instead?{' '}
+            <Link
+              to="/site-audit"
+              className="font-medium text-accent-on-tint underline-offset-4 hover:underline"
+            >
+              Run a site audit
+            </Link>
+            .
+          </>
+        }
+      />
 
-        <Notice error={submitError} />
+      <Panel className="mt-8">
+        <Notice error={submitError} className="mb-4" />
         {outOfQuota && !submitError ? (
-          <Notice tone="warning">
-            <strong>Daily limit reached.</strong> Your allowance resets at midnight UTC.
+          <Notice tone="warning" className="mb-4">
+            <strong className="font-semibold">Daily limit reached.</strong> Your
+            allowance resets at midnight UTC.
           </Notice>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="submit-row" noValidate>
-          <div className="field">
-            <label htmlFor="url" className="sr-only" style={{ display: 'none' }}>
-              URL
-            </label>
-            <input
-              id="url"
-              type="text"
-              inputMode="url"
-              placeholder="https://example.com"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={submitting}
-              required
-            />
+        <form onSubmit={handleSubmit} noValidate className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="url">Page URL</Label>
+            <div className="flex flex-col gap-2.5 sm:flex-row">
+              <div className="relative flex-1">
+                <Search
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  id="url"
+                  type="text"
+                  inputMode="url"
+                  placeholder="https://example.com"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  disabled={submitting}
+                  required
+                  className="h-10 pl-9"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={submitting || !url.trim()}
+                className="h-10 px-5 sm:w-auto"
+              >
+                {submitting ? (
+                  <>
+                    <Spinner />
+                    Analyzing
+                  </>
+                ) : (
+                  'Analyze'
+                )}
+              </Button>
+            </div>
           </div>
-          <div className="field">
-            <label htmlFor="keywords" className="sr-only" style={{ display: 'none' }}>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="keywords">
               Target keywords
-            </label>
-            <input
+              <span className="font-normal text-muted-foreground">optional</span>
+            </Label>
+            <Input
               id="keywords"
               type="text"
-              placeholder="Target keywords (optional, comma separated)"
+              placeholder="running shoes, trail runners"
               value={keywordInput}
               onChange={(e) => setKeywordInput(e.target.value)}
               disabled={submitting}
+              aria-describedby="keywords-hint"
+              className="h-10"
             />
+            <p id="keywords-hint" className="text-[12.5px] text-muted-foreground">
+              Up to {MAX_TARGET_KEYWORDS}, comma separated. You get a map of where
+              each one appears on the page, scored separately so it never moves the
+              page score.
+            </p>
           </div>
-          <button type="submit" className="btn" disabled={submitting || !url.trim()}>
-            {submitting ? <span className="spinner" /> : 'Analyze'}
-          </button>
         </form>
 
-        <div style={{ marginTop: 18 }}>
-          <QuotaBar quota={quota} />
-        </div>
-      </div>
+        <Separator className="my-5" />
+        <QuotaBar quota={quota} />
+      </Panel>
 
-      <div className="card">
-        <div className="section-head">
-          <h2>Recent page reports</h2>
-          {history ? (
-            <span className="quota-text">
-              {history.total} total
-            </span>
-          ) : null}
-        </div>
-
-        <Notice error={listError} />
+      <Section
+        title="Recent page reports"
+        meta={history ? `${history.total} total` : undefined}
+      >
+        <Notice error={listError} className="mb-4" />
 
         {loadingList && !history ? (
-          <div className="empty">
-            <span className="spinner" /> Loading your history…
-          </div>
+          <TableSkeleton />
         ) : history && history.items.length > 0 ? (
           <>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Page</th>
-                    <th>Status</th>
-                    <th className="right">Score</th>
-                    <th>Analyzed</th>
-                    <th aria-label="Actions" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.items.map((report) => (
-                    <tr key={report.id}>
-                      <td>
-                        <Link to={`/report/${report.id}`} className="cell-url">
-                          <span className="primary">{report.title || shortUrl(report.url)}</span>
-                          <span className="secondary">
-                            {shortUrl(report.url)}
-                            {report.target_keywords?.length
-                              ? ` · ${report.target_keywords.join(', ')}`
-                              : ''}
-                          </span>
-                        </Link>
-                      </td>
-                      <td>
-                        <StatusPill status={report.status} />
-                      </td>
-                      <td className="right">
-                        {report.overall_score === null ? (
-                          <span style={{ color: 'var(--muted)' }}>—</span>
-                        ) : (
-                          <strong style={{ color: scoreColor(report.overall_score) }}>
-                            {report.overall_score}
-                            {report.overall_grade ? (
-                              <span style={{ color: 'var(--muted)', fontWeight: 500 }}>
-                                {' '}
-                                {report.overall_grade}
-                              </span>
-                            ) : null}
-                          </strong>
-                        )}
-                      </td>
-                      <td style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                        {formatDate(report.created_at)}
-                      </td>
-                      <td className="right">
-                        <button
-                          type="button"
-                          className="btn danger"
-                          onClick={() => handleDelete(report.id)}
-                          aria-label={`Delete report for ${report.url}`}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Page</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Score</TableHead>
+                  <TableHead>Analyzed</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.items.map((report) => (
+                  <TableRow key={report.id} className="group">
+                    <TableCell className="max-w-[420px]">
+                      <Link
+                        to={`/report/${report.id}`}
+                        className="block min-w-0 rounded-sm"
+                      >
+                        <span className="block truncate font-medium">
+                          {report.title || shortUrl(report.url)}
+                        </span>
+                        <span className="block truncate text-[12.5px] text-muted-foreground">
+                          {shortUrl(report.url)}
+                          {report.target_keywords?.length
+                            ? ` · ${report.target_keywords.join(', ')}`
+                            : ''}
+                        </span>
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <StatusPill status={report.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <ScoreCell
+                        score={report.overall_score}
+                        grade={report.overall_grade}
+                      />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {formatDate(report.created_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setPendingDelete(report)}
+                        aria-label={`Delete report for ${report.url}`}
+                        className="text-muted-foreground hover:bg-crit-soft hover:text-crit"
+                      >
+                        <Trash2 />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
 
-            {totalPages > 1 ? (
-              <div className="pager">
-                <span>
-                  Page {history.page} of {totalPages}
-                </span>
-                <div className="controls">
-                  <button
-                    type="button"
-                    className="btn secondary"
-                    disabled={page <= 1 || loadingList}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    className="btn secondary"
-                    disabled={page >= totalPages || loadingList}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            ) : null}
+            <Pager
+              page={history.page}
+              totalPages={totalPages}
+              busy={loadingList}
+              onChange={setPage}
+            />
           </>
         ) : (
-          <div className="empty">
-            <h3>No page reports yet</h3>
-            <p>Audit a page above and it will show up here.</p>
-          </div>
+          <EmptyState
+            icon={<FileSearch className="size-5" />}
+            title="No page reports yet"
+          >
+            Audit a page above and it will show up here.
+          </EmptyState>
         )}
-      </div>
+      </Section>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null)
+        }}
+        title="Delete this report?"
+        description={
+          pendingDelete
+            ? `The report for ${shortUrl(pendingDelete.url)} will be removed permanently. This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete report"
+        destructive
+        onConfirm={confirmDelete}
+      />
     </>
   )
 }

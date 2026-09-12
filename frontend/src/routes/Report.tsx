@@ -1,11 +1,13 @@
 /** Single-page report: polls until the worker finishes, then renders it. */
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { analysesApi } from '../api/endpoints'
 import type { ReportDetail } from '../api/types'
 import { Notice } from '../components/Notice'
 import { ReportBody } from '../components/ReportBody'
 import { StatusPill } from '../components/StatusPill'
+import { BackLink } from '../components/Page'
+import { CenterNote, FailedPanel, PendingPanel } from '../components/ReportStates'
 
 /** Roughly two minutes of polling before we stop and let the user retry. */
 const MAX_POLLS = 50
@@ -66,94 +68,60 @@ export function Report() {
     }
   }, [id, reloadKey])
 
-  const results = report?.results ?? null
+  const back = <BackLink to="/app">Back to page audit</BackLink>
 
   if (error) {
     return (
       <>
-        <Link to="/app" className="back-link">
-          ← Back to page audit
-        </Link>
-        <Notice error={error} />
+        {back}
+        <Notice error={error} className="mt-4" />
       </>
     )
   }
 
   if (!report) {
-    return (
-      <div className="center-note">
-        <span className="spinner" />
-        <span>Loading report…</span>
-      </div>
-    )
+    return <CenterNote>Loading report…</CenterNote>
   }
 
+  const results = report.results
   const waiting = report.status === 'pending' || report.status === 'running'
 
   return (
     <>
-      <Link to="/app" className="back-link">
-        ← Back to page audit
-      </Link>
+      {back}
 
       {waiting ? (
-        <div className="card">
-          <div className="report-head">
-            <div className="meta">
-              <h1>{report.title || report.url}</h1>
-              <div className="url">{report.url}</div>
-              <div style={{ marginTop: 12 }}>
-                <StatusPill status={report.status} />
-              </div>
-            </div>
-          </div>
-          {timedOut ? (
-            <Notice tone="warning">
-              <strong>Still running.</strong> This is taking longer than expected. The
-              worker may be busy or stopped.{' '}
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => setReloadKey((k) => k + 1)}
-              >
-                Check again
-              </button>
-            </Notice>
-          ) : (
-            <p className="card-sub" style={{ marginTop: 18, marginBottom: 0 }}>
-              <span className="spinner" /> Fetching the page and running every check.
-              This usually takes a few seconds.
-            </p>
-          )}
-        </div>
+        <PendingPanel
+          title={report.title || report.url}
+          url={report.url}
+          status={report.status}
+          timedOut={timedOut}
+          onRetry={() => setReloadKey((k) => k + 1)}
+          stalledNoun="Still running."
+        >
+          Fetching the page and running every check. This usually takes a few
+          seconds.
+        </PendingPanel>
       ) : null}
 
       {report.status === 'failed' ? (
-        <div className="card">
-          <div className="report-head">
-            <div className="meta">
-              <h1>Analysis failed</h1>
-              <div className="url">{report.url}</div>
-              <div style={{ marginTop: 12 }}>
-                <StatusPill status={report.status} />
-              </div>
-            </div>
-          </div>
-          <Notice tone="error">
-            {report.error || 'The page could not be analyzed.'}
-          </Notice>
-          <p className="card-sub" style={{ marginBottom: 0 }}>
-            Your daily quota unit was refunded, so this attempt cost you nothing.
-          </p>
-        </div>
+        <FailedPanel
+          title="Analysis failed"
+          url={report.url}
+          status={report.status}
+          error={report.error}
+          fallback="The page could not be analyzed."
+        />
       ) : null}
 
       {results && report.status === 'done' ? (
-        <ReportBody
-          results={results}
-          targetKeywords={report.target_keywords}
-          badge={<StatusPill status={report.status} />}
-        />
+        <div className="mt-6">
+          <ReportBody
+            results={results}
+            targetKeywords={report.target_keywords}
+            badge={<StatusPill status={report.status} />}
+          />
+        </div>
       ) : null}
     </>
   )

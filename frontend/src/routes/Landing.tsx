@@ -164,7 +164,7 @@ export function Landing() {
   }
 
   return (
-    <div className="landing font-sans text-foreground">
+    <div className="font-sans text-foreground">
       <header className="sticky top-0 z-50 flex h-[var(--header-h)] items-center gap-4 border-b border-border bg-background/85 px-5 backdrop-blur-md backdrop-saturate-150">
         <Link to="/" className="flex items-center gap-2.5 font-semibold tracking-tight">
           <span className="size-2.5 rounded-full bg-primary ring-4 ring-accent-soft" />

@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.seo import fetcher, urlguard
+from app.seo import fetcher, psi, urlguard
 from app.seo.checks import ALL_CHECKS
 from app.seo.checks.links import classify_links
 from app.seo.keywords import analyze_keywords
@@ -163,6 +163,24 @@ async def _gather_async_signals(
         await check_broken()
 
 
+async def _run_psi(
+    ctx: AnalysisContext,
+    api_key: str,
+    strategies: list[str] | None,
+    semaphore: asyncio.Semaphore | None,
+) -> None:
+    """Attach PageSpeed Insights data to ``ctx.extra['psi']``.
+
+    Runs against the *final* URL so a redirect does not send Lighthouse to a
+    page that immediately bounces. Never raises: PSI is enrichment, and a
+    Google outage must not cost the user their whole report.
+    """
+    results, error = await psi.run_strategies(
+        ctx.fetch.final_url, api_key, strategies, semaphore=semaphore
+    )
+    ctx.extra["psi"] = {"strategies": results, "error": error}
+
+
 async def analyze(
     url: str,
     target_keywords: list[str] | None = None,
@@ -170,12 +188,19 @@ async def analyze(
     site_signals: dict | None = None,
     collect_links: bool = False,
     max_broken_checks: int | None = None,
+    psi_key: str | None = None,
+    psi_strategies: list[str] | None = None,
+    psi_semaphore: asyncio.Semaphore | None = None,
 ) -> dict:
     """Run a full analysis and return a JSON-serializable result dict.
 
     ``collect_links`` adds the page's internal links under ``internal_links``.
     A site audit needs them to walk a site that has no sitemap; the single-page
     path leaves them out because they are large and nothing reads them.
+
+    ``psi_key`` turns on the PageSpeed Insights checks. Without one the
+    PSI-backed checks report themselves as unavailable and go unscored, so the
+    result keeps the same shape either way.
     """
     fetch = await fetcher.fetch(url)
     if not fetch.ok or not fetch.text:
@@ -198,8 +223,16 @@ async def analyze(
     )
 
     # 1) Site-level signals, link classification and broken-link sampling, all
-    #    within one HTTP client's lifetime.
-    await _gather_async_signals(ctx, site_signals, max_broken_checks=max_broken_checks)
+    #    within one HTTP client's lifetime. A PSI run is 10-30s against Google
+    #    while these are short requests to the target host, so overlapping them
+    #    makes PSI close to free in wall-clock terms instead of doubling the
+    #    time an analysis takes.
+    signal_work = [
+        _gather_async_signals(ctx, site_signals, max_broken_checks=max_broken_checks)
+    ]
+    if psi_key:
+        signal_work.append(_run_psi(ctx, psi_key, psi_strategies, psi_semaphore))
+    await asyncio.gather(*signal_work)
 
     # 2) Run every synchronous check.
     checks: list[CheckResult] = []
@@ -241,6 +274,9 @@ async def analyze(
         },
         "category_scores": breakdown.categories,
         "checks": [c.__dict__ for c in checks],
+        # Carried whole so the report can show both strategies side by side,
+        # while the checks above score the mobile one.
+        "psi": ctx.extra.get("psi"),
         "error": None,
     }
     if collect_links:

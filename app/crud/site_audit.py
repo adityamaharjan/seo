@@ -7,9 +7,21 @@ from app.models.site_audit import SiteAudit, SiteAuditPage
 
 
 async def create_pending(
-    db: AsyncSession, *, user_id: int, url: str, max_pages: int
+    db: AsyncSession,
+    *,
+    user_id: int,
+    url: str,
+    max_pages: int,
+    used_psi: bool = False,
+    psi_scope: str | None = None,
 ) -> SiteAudit:
-    audit = SiteAudit(user_id=user_id, start_url=url, max_pages=max_pages)
+    audit = SiteAudit(
+        user_id=user_id,
+        start_url=url,
+        max_pages=max_pages,
+        used_psi=used_psi,
+        psi_scope=psi_scope,
+    )
     db.add(audit)
     await db.flush()
     return audit

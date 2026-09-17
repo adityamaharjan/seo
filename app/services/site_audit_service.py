@@ -19,10 +19,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.crud import site_audit as audit_crud
-from app.models.site_audit import SiteAudit, SiteAuditPage, SiteAuditStatus
+from app.models.site_audit import (
+    PSI_SAMPLE_SIZE,
+    PsiScope,
+    SiteAudit,
+    SiteAuditPage,
+    SiteAuditStatus,
+)
 from app.seo import analyzer, crawler
 from app.seo.scoring import STATUSES, grade
-from app.services import quota_service
+from app.services import api_key_service, quota_service
 
 logger = get_logger(__name__)
 
@@ -181,7 +187,25 @@ def aggregate(start_url: str, results: list[tuple[str, dict]], *, source: str) -
     }
 
 
-async def _crawl(audit: SiteAudit) -> tuple[list[tuple[str, dict]], str]:
+def _psi_budget(audit: SiteAudit) -> int:
+    """How many pages of this crawl may get a PageSpeed run.
+
+    Expressed as a count rather than a set of URLs because the page list is
+    not known until the crawl is under way. Pages are analyzed in discovery
+    order — breadth-first from the start URL — so spending the budget on the
+    first N pages spends it on the shallowest, most linked-to ones.
+    """
+    scope = audit.psi_scope or PsiScope.off
+    if scope == PsiScope.all:
+        return audit.max_pages
+    if scope == PsiScope.sample:
+        return min(PSI_SAMPLE_SIZE, audit.max_pages)
+    if scope == PsiScope.homepage:
+        return 1
+    return 0
+
+
+async def _crawl(audit: SiteAudit, psi_key: str | None) -> tuple[list[tuple[str, dict]], str]:
     """Discover and analyze up to ``max_pages`` pages, newest frontier first."""
     start = crawler.normalize(audit.start_url)
     host = urlparse(start).netloc
@@ -208,8 +232,16 @@ async def _crawl(audit: SiteAudit) -> tuple[list[tuple[str, dict]], str]:
     page_signals = signals.as_page_signals()
     results: list[tuple[str, dict]] = []
     semaphore = asyncio.Semaphore(settings.SITE_AUDIT_CONCURRENCY)
+    # PSI gets its own limit, deliberately higher than the crawl's. Page
+    # concurrency is kept low to be a good citizen towards the site being
+    # audited; PSI calls go to Google instead, cost nothing from that host, and
+    # are slow enough that running them four at a time would dominate the
+    # audit's wall-clock budget.
+    psi_semaphore = asyncio.Semaphore(settings.PSI_CONCURRENCY)
+    psi_budget = _psi_budget(audit) if psi_key else 0
+    psi_spent = 0
 
-    async def analyze_one(url: str) -> tuple[str, dict]:
+    async def analyze_one(url: str, with_psi: bool) -> tuple[str, dict]:
         async with semaphore:
             try:
                 return url, await analyzer.analyze(
@@ -217,6 +249,8 @@ async def _crawl(audit: SiteAudit) -> tuple[list[tuple[str, dict]], str]:
                     site_signals=page_signals,
                     collect_links=follow_links,
                     max_broken_checks=settings.SITE_AUDIT_BROKEN_LINK_CHECKS,
+                    psi_key=psi_key if with_psi else None,
+                    psi_semaphore=psi_semaphore,
                 )
             except Exception as exc:  # one bad page must not end the crawl
                 logger.warning("page analysis failed", extra={"url": url, "error": str(exc)})
@@ -228,7 +262,14 @@ async def _crawl(audit: SiteAudit) -> tuple[list[tuple[str, dict]], str]:
         remaining = audit.max_pages - len(results)
         batch = queue[: min(settings.SITE_AUDIT_CONCURRENCY, remaining)]
         del queue[: len(batch)]
-        for url, result in await asyncio.gather(*(analyze_one(u) for u in batch)):
+        # Spend the PSI budget on the earliest pages in the batch, so a scope
+        # narrower than the crawl lands on the shallowest URLs rather than
+        # wherever the batch boundary happens to fall.
+        psi_flags = [psi_spent + i < psi_budget for i in range(len(batch))]
+        psi_spent += sum(psi_flags)
+        for url, result in await asyncio.gather(
+            *(analyze_one(u, flag) for u, flag in zip(batch, psi_flags, strict=True))
+        ):
             results.append((url, result))
             # Stop discovering once enough URLs are known. Filtering marks a URL
             # as seen, so looking for links we have no room to queue would
@@ -254,11 +295,38 @@ async def run_site_audit(db: AsyncSession, audit_id: int) -> SiteAudit:
     audit.status = SiteAuditStatus.running
     await db.commit()
 
+    # Resolved here rather than carried through the queue, so a decrypted key
+    # never lands in a Redis job payload.
+    psi_key = None
+    if audit.used_psi:
+        psi_key = await api_key_service.resolve_psi_key(
+            db, audit.user_id, requested=None
+        )
+        if psi_key is None:
+            logger.warning("psi requested but no key available",
+                           extra={"audit_id": audit_id})
+            audit.used_psi = False
+
     try:
-        results, source = await _crawl(audit)
+        results, source = await _crawl(audit, psi_key)
     except Exception as exc:
         logger.exception("site audit crashed", extra={"audit_id": audit_id})
         return await mark_failed(db, audit, str(exc))
+
+    if psi_key:
+        # One outcome for the whole crawl: an error on any page is worth
+        # surfacing (it is almost always quota exhaustion, which will affect
+        # every later run too), while a single success proves the key works.
+        psi_errors = [
+            (r.get("psi") or {}).get("error") for _, r in results
+        ]
+        any_success = any((r.get("psi") or {}).get("strategies") for _, r in results)
+        await api_key_service.record_psi_outcome(
+            db,
+            audit.user_id,
+            error=None if any_success else next((e for e in psi_errors if e), None),
+        )
+        audit.used_psi = any_success
 
     if not results or not any(r.get("fetched_ok") for _, r in results):
         first_error = next(

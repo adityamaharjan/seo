@@ -5,6 +5,7 @@ import type {
   ApiKeyProvider,
   ApiKeySettings,
   Paginated,
+  PsiScope,
   Quota,
   ReportDetail,
   ReportSummary,
@@ -109,10 +110,15 @@ export const adminApi = {
 }
 
 export const analysesApi = {
-  submit: (url: string, targetKeywords: string[] = []) =>
+  /**
+   * `usePsi` is tri-state on purpose: `undefined` follows whatever key the
+   * account has, `true` insists (and is rejected with a 400 when no key is
+   * saved), `false` skips PageSpeed without having to delete the stored key.
+   */
+  submit: (url: string, targetKeywords: string[] = [], usePsi?: boolean) =>
     request<AnalysisAccepted>('/analyses', {
       method: 'POST',
-      body: { url, target_keywords: targetKeywords },
+      body: { url, target_keywords: targetKeywords, use_psi: usePsi },
     }),
 
   list: (page = 1, pageSize = 20) =>
@@ -129,10 +135,10 @@ export const analysesApi = {
  * analysesApi — a site audit takes a page budget and never takes keywords.
  */
 export const siteAuditsApi = {
-  submit: (url: string, maxPages: number) =>
+  submit: (url: string, maxPages: number, usePsi?: boolean, psiScope?: PsiScope) =>
     request<SiteAuditAccepted>('/site-audits', {
       method: 'POST',
-      body: { url, max_pages: maxPages },
+      body: { url, max_pages: maxPages, use_psi: usePsi, psi_scope: psiScope },
     }),
 
   list: (page = 1, pageSize = 20) =>

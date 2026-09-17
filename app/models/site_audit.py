@@ -41,6 +41,28 @@ class SiteAuditStatus(enum.StrEnum):
     failed = "failed"
 
 
+class PsiScope(enum.StrEnum):
+    """How much of a crawl gets a PageSpeed run.
+
+    A PSI call is 10-30 seconds per page per strategy and one unit of a 25k/day
+    quota, so on a 50-page crawl this is the difference between a one-minute
+    tail and an hour. It is a per-audit choice rather than a global setting
+    because the right answer depends on the site, not the installation.
+    """
+
+    off = "off"
+    homepage = "homepage"  # the crawl's start URL only
+    # The first pages the crawl reaches. Discovery is breadth-first from the
+    # start URL, so these are the shallowest pages — the ones most linked-to
+    # and usually the ones that matter most.
+    sample = "sample"
+    all = "all"
+
+
+# Pages given a PSI run under ``PsiScope.sample``.
+PSI_SAMPLE_SIZE = 5
+
+
 class SiteAudit(Base, TimestampMixin):
     __tablename__ = "site_audits"
 
@@ -62,6 +84,12 @@ class SiteAudit(Base, TimestampMixin):
     quota_refunded: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False, server_default=text("0")
     )
+    # Whether the crawl ran PageSpeed Insights, and over how much of it. Stored
+    # so a report can say which pages carry rendered metrics and which do not.
+    used_psi: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default=text("0")
+    )
+    psi_scope: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     # How many pages were asked for, versus what the crawl actually managed.
     max_pages: Mapped[int] = mapped_column(Integer, default=10, nullable=False)

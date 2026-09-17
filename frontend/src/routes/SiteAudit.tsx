@@ -9,8 +9,9 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Globe, Search, Trash2 } from 'lucide-react'
 import { quotaApi, siteAuditsApi } from '../api/endpoints'
-import type { Paginated, Quota, SiteAuditSummary } from '../api/types'
+import type { Paginated, PsiScope, Quota, SiteAuditSummary } from '../api/types'
 import { Notice } from '../components/Notice'
+import { PsiOption, usePsiKey } from '../components/PsiOption'
 import { QuotaBar } from '../components/QuotaBar'
 import { StatusPill } from '../components/StatusPill'
 import { ScoreCell } from '../components/ScoreRing'
@@ -48,6 +49,14 @@ export function SiteAudit() {
   const navigate = useNavigate()
   const [url, setUrl] = useState('')
   const [maxPages, setMaxPages] = useState(DEFAULT_BUDGET)
+  // Opt-out rather than opt-in: with a key saved, the default is to use it.
+  const psiKey = usePsiKey()
+  const [usePsi, setUsePsi] = useState(true)
+  // 'homepage' is the default coverage even though the API would accept 'all'.
+  // A PSI run is 20-30s per page, so defaulting a 50-page crawl to full
+  // coverage would turn a two-minute audit into a twenty-minute one for
+  // someone who only ticked a box.
+  const [psiScope, setPsiScope] = useState<PsiScope>('homepage')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<unknown>(null)
 
@@ -93,7 +102,13 @@ export function SiteAudit() {
     setSubmitting(true)
     setSubmitError(null)
     try {
-      const accepted = await siteAuditsApi.submit(normalizeUrl(target), maxPages)
+      const accepted = await siteAuditsApi.submit(
+        normalizeUrl(target),
+        maxPages,
+        // Only ever an explicit false; see the page audit for why.
+        psiKey.configured && !usePsi ? false : undefined,
+        psiKey.configured && usePsi ? psiScope : undefined,
+      )
       setUrl('')
       loadQuota()
       navigate(`/site-audit/${accepted.id}`)
@@ -211,6 +226,16 @@ export function SiteAudit() {
               One crawl costs one quota unit whatever the page count.
             </p>
           </div>
+
+          <PsiOption
+            keyState={psiKey}
+            enabled={usePsi}
+            onEnabledChange={setUsePsi}
+            disabled={submitting}
+            scope={psiScope}
+            onScopeChange={setPsiScope}
+            maxPages={maxPages}
+          />
         </form>
 
         <Separator className="my-5" />

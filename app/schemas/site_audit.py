@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 from app.core.config import settings
-from app.models.site_audit import SiteAuditStatus
+from app.models.site_audit import PsiScope, SiteAuditStatus
 from app.seo import urlguard
 
 
@@ -16,6 +16,22 @@ class SiteAuditCreate(BaseModel):
         ge=1,
         le=settings.SITE_AUDIT_MAX_PAGES,
         description="Upper bound on pages to crawl. The crawl may find fewer.",
+    )
+
+    use_psi: bool | None = Field(
+        default=None,
+        description=(
+            "True to require PageSpeed Insights data, False to skip it, "
+            "omitted to use the account's saved key when there is one."
+        ),
+    )
+    psi_scope: PsiScope = Field(
+        default=PsiScope.all,
+        description=(
+            "How many crawled pages get a PageSpeed run. Each one adds roughly "
+            "10-30 seconds per strategy and one unit of the key's daily quota, "
+            "so a large crawl with 'all' is substantially slower than one without."
+        ),
     )
 
     @field_validator("url")
@@ -42,6 +58,8 @@ class SiteAuditSummary(BaseModel):
     discovery_source: str | None
     overall_score: int | None
     overall_grade: str | None
+    used_psi: bool
+    psi_scope: str | None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

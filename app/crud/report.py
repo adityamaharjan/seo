@@ -12,12 +12,14 @@ async def create_pending(
     user_id: int,
     url: str,
     target_keywords: list[str] | None = None,
+    used_psi: bool = False,
 ) -> Report:
     report = Report(
         user_id=user_id,
         url=url,
         status=ReportStatus.pending,
         target_keywords=target_keywords or None,
+        used_psi=used_psi,
     )
     db.add(report)
     await db.flush()

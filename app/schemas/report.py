@@ -14,6 +14,17 @@ class AnalysisCreate(BaseModel):
     # Terms this page should be judged against. Optional: with none given,
     # keyword placement is reported as informational and left unscored.
     target_keywords: list[str] = Field(default_factory=list)
+    # Whether to enrich this run with PageSpeed Insights. None means "use
+    # whatever my account has": the request stays valid for a caller that has
+    # never heard of PageSpeed, while True is an explicit ask that fails
+    # loudly when no key is stored.
+    use_psi: bool | None = Field(
+        default=None,
+        description=(
+            "True to require PageSpeed Insights data, False to skip it, "
+            "omitted to use the account's saved key when there is one."
+        ),
+    )
 
     @field_validator("target_keywords")
     @classmethod
@@ -59,6 +70,7 @@ class ReportSummary(BaseModel):
     target_keywords: list[str] | None
     overall_score: int | None
     overall_grade: str | None
+    used_psi: bool
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -16,6 +16,7 @@ import { FileSearch, Search, Trash2 } from 'lucide-react'
 import { analysesApi, quotaApi } from '../api/endpoints'
 import type { Paginated, Quota, ReportSummary } from '../api/types'
 import { Notice } from '../components/Notice'
+import { PsiOption, usePsiKey } from '../components/PsiOption'
 import { QuotaBar } from '../components/QuotaBar'
 import { StatusPill } from '../components/StatusPill'
 import { ScoreCell } from '../components/ScoreRing'
@@ -61,6 +62,9 @@ export function PageAudit() {
   const [params] = useSearchParams()
   const [url, setUrl] = useState(() => params.get('url') ?? '')
   const [keywordInput, setKeywordInput] = useState('')
+  // Opt-out rather than opt-in: with a key saved, the default is to use it.
+  const psiKey = usePsiKey()
+  const [usePsi, setUsePsi] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<unknown>(null)
 
@@ -109,6 +113,10 @@ export function PageAudit() {
       const accepted = await analysesApi.submit(
         normalizeUrl(target),
         parseKeywords(keywordInput),
+        // Only ever sent as an explicit false. Sending true would make the
+        // request fail outright if the key were removed in another tab,
+        // whereas omitting it lets the server fall back gracefully.
+        psiKey.configured && !usePsi ? false : undefined,
       )
       setUrl('')
       setKeywordInput('')
@@ -226,6 +234,13 @@ export function PageAudit() {
               page score.
             </p>
           </div>
+
+          <PsiOption
+            keyState={psiKey}
+            enabled={usePsi}
+            onEnabledChange={setUsePsi}
+            disabled={submitting}
+          />
         </form>
 
         <Separator className="my-5" />

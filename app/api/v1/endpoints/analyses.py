@@ -17,7 +17,7 @@ from app.schemas.report import (
     ReportDetail,
     ReportSummary,
 )
-from app.services import report_service
+from app.services import api_key_service, report_service
 
 logger = get_logger(__name__)
 
@@ -33,11 +33,19 @@ async def create_analysis(
 ) -> AnalysisAccepted:
     """Submit a URL for analysis. Quota is consumed here; work runs in the
     background worker. Poll the returned ``status_url`` for the result."""
+    # Resolved before anything is written: asking for PageSpeed data without a
+    # key is rejected here, while the quota unit is still refundable and the
+    # user is still looking at the form.
+    psi_key = await api_key_service.resolve_psi_key(
+        db, user.id, requested=payload.use_psi
+    )
+
     report = await report_crud.create_pending(
         db,
         user_id=user.id,
         url=str(payload.url),
         target_keywords=payload.target_keywords,
+        used_psi=psi_key is not None,
     )
 
     # Commit before enqueueing. The worker can pick the job up within

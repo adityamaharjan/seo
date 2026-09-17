@@ -35,6 +35,13 @@ export interface Quota {
 
 export type ApiKeyProvider = 'google_psi'
 
+/**
+ * How much of a crawl gets a PageSpeed run. Each page costs roughly 10-30
+ * seconds per strategy and one unit of the key's 25k/day quota, so on a large
+ * crawl this is the difference between a short tail and a very long one.
+ */
+export type PsiScope = 'off' | 'homepage' | 'sample' | 'all'
+
 export interface ApiKeyStatus {
   provider: ApiKeyProvider
   configured: boolean
@@ -66,6 +73,8 @@ export interface ReportSummary {
   target_keywords: string[] | null
   overall_score: number | null
   overall_grade: string | null
+  /** Whether this run was enriched with Google PageSpeed Insights data. */
+  used_psi: boolean
   created_at: string
 }
 
@@ -225,6 +234,8 @@ export interface SiteAuditSummary {
   discovery_source: string | null
   overall_score: number | null
   overall_grade: string | null
+  used_psi: boolean
+  psi_scope: PsiScope | null
   created_at: string
 }
 

@@ -66,6 +66,12 @@ class Report(Base, TimestampMixin):
     )
     overall_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     overall_grade: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    # Whether this run was enriched with PageSpeed Insights data. Stored
+    # because it changes what the performance category is scored from, so a
+    # report is only comparable with another that made the same choice.
+    used_psi: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default=text("0")
+    )
     ttfb_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     load_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
 

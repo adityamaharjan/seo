@@ -402,8 +402,59 @@ function LegendKey({
   )
 }
 
+interface PsiOpportunity {
+  id: string
+  title: string
+  savings_ms: number
+  savings_bytes: number
+}
+
+/**
+ * Lighthouse's ranked fixes. These need their own renderer: the generic one
+ * stringifies an array of objects into "[object Object]", and the ordering is
+ * the whole point — the list is sorted by estimated impact, so it reads as a
+ * work queue rather than a set of unrelated notes.
+ */
+function OpportunityList({ items }: { items: PsiOpportunity[] }) {
+  return (
+    <ul className="mt-2.5 grid gap-1.5">
+      {items.map((item) => (
+        <li
+          key={item.id}
+          className="flex items-baseline justify-between gap-3 text-[13px]"
+        >
+          <span className="min-w-0 break-words">{item.title}</span>
+          <span className="shrink-0 font-mono text-[12px] tabular-nums text-muted-foreground">
+            {item.savings_ms > 0
+              ? `−${formatMs(item.savings_ms)}`
+              : `−${formatKb(item.savings_bytes / 1024)}`}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/**
+ * PageSpeed checks whose message already spells the numbers out in full.
+ * Repeating the raw payload underneath them adds a line of `lcp ms: 1568 ·
+ * cls: 0.001` that says the same thing less clearly.
+ */
+const SELF_DESCRIBING = new Set([
+  'core_web_vitals',
+  'field_vitals',
+  'lighthouse_performance',
+  'lighthouse_categories',
+])
+
 function CheckRow({ check }: { check: CheckResult }) {
-  const detail = renderValue(check.value)
+  const opportunities =
+    check.id === 'pagespeed_opportunities' && Array.isArray(check.value)
+      ? (check.value as PsiOpportunity[])
+      : null
+  const detail =
+    opportunities || SELF_DESCRIBING.has(check.id) ? null : renderValue(check.value)
+
   return (
     <Finding
       status={check.status}
@@ -413,6 +464,9 @@ function CheckRow({ check }: { check: CheckResult }) {
       trailing={check.status === 'info' ? '—' : check.score}
     >
       {detail ? <FindingDetail>{detail}</FindingDetail> : null}
+      {opportunities && opportunities.length > 0 ? (
+        <OpportunityList items={opportunities} />
+      ) : null}
       {check.recommendation ? <FindingFix>{check.recommendation}</FindingFix> : null}
     </Finding>
   )

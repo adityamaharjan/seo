@@ -24,7 +24,8 @@ from app.schemas.site_audit import (
     SiteAuditPageDetail,
     SiteAuditSummary,
 )
-from app.services import site_audit_service
+from app.models.site_audit import PsiScope
+from app.services import api_key_service, site_audit_service
 
 logger = get_logger(__name__)
 
@@ -43,8 +44,23 @@ async def create_site_audit(
     One quota unit covers the whole crawl regardless of page count; the page
     budget is what bounds the work instead.
     """
+    # Resolved before anything is written: asking for PageSpeed data without a
+    # key is rejected here, while the quota unit is still refundable and the
+    # user is still looking at the form.
+    scope = PsiScope.off if payload.use_psi is False else payload.psi_scope
+    psi_key = (
+        await api_key_service.resolve_psi_key(db, user.id, requested=payload.use_psi)
+        if scope != PsiScope.off
+        else None
+    )
+
     audit = await audit_crud.create_pending(
-        db, user_id=user.id, url=str(payload.url), max_pages=payload.max_pages
+        db,
+        user_id=user.id,
+        url=str(payload.url),
+        max_pages=payload.max_pages,
+        used_psi=psi_key is not None,
+        psi_scope=scope.value if psi_key is not None else PsiScope.off.value,
     )
 
     # Commit before enqueueing. The worker can pick the job up within

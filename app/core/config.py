@@ -108,6 +108,14 @@ class Settings(BaseSettings):
     # Rotating it makes every stored key undecryptable; users must re-enter them.
     API_KEY_ENCRYPTION_KEY: str = ""
 
+    # Local-development fallback PSI key. Outside production, a user with no
+    # stored key of their own falls back to this one so PageSpeed features can
+    # be exercised without registering a Google Cloud project per developer.
+    # It is ignored in production: there, PSI is strictly bring-your-own-key,
+    # because a server-wide key would put every user's audits on one 25k/day
+    # quota and one bill.
+    GOOGLE_PAGE_SPEED_INSIGHTS_API_KEY: str = ""
+
     # --- SEO engine limits ---
     SEO_TIMEOUT_SECONDS: int = 15
     SEO_MAX_PAGE_BYTES: int = 5_000_000  # 5 MB hard cap on fetched HTML
@@ -137,6 +145,17 @@ class Settings(BaseSettings):
     # multiply by the page concurrency into ~100 simultaneous requests at one
     # host, which reads as an attack and gets rate-limited into false positives.
     SITE_AUDIT_BROKEN_LINK_CHECKS: int = 5
+
+    # --- PageSpeed Insights ---
+    # A PSI run is a real Lighthouse execution on Google's infrastructure, so
+    # it takes far longer than any other call the analyzer makes.
+    PSI_TIMEOUT_SECONDS: int = 90
+    # Strategies run per URL. Mobile is what Google ranks on; desktop is worth
+    # having alongside it, at double the time and quota.
+    PSI_STRATEGIES: Annotated[list[str], NoDecode] = ["mobile", "desktop"]
+    # Concurrent PSI calls per audit. PSI allows 240 queries/minute per key, so
+    # the binding constraint is the audit's own wall-clock budget, not the API.
+    PSI_CONCURRENCY: int = 6
 
     @property
     def is_production(self) -> bool:
@@ -187,7 +206,7 @@ class Settings(BaseSettings):
             )
         return self
 
-    @field_validator("CORS_ORIGINS", "CORS_EXPOSE_HEADERS", mode="before")
+    @field_validator("CORS_ORIGINS", "CORS_EXPOSE_HEADERS", "PSI_STRATEGIES", mode="before")
     @classmethod
     def _split_list(cls, v):
         """Accept both a comma-separated string and a real list.

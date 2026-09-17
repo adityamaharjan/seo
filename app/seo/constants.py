@@ -60,7 +60,14 @@ CHECK_WEIGHTS: dict[str, float] = {
     "compression": 1.5,
     "render_blocking": 1.5,
     "page_size": 1.0,
-    "core_web_vitals": 1.0,
+    # PSI checks, present only when a PageSpeed key was used. Field data
+    # outweighs lab data because it is what Google actually ranks on; the lab
+    # numbers are a reproducible proxy for it. Together they come to roughly
+    # half the category when present, which is the intent: measured rendering
+    # beats the transfer-level estimates above it.
+    "field_vitals": 3.0,
+    "core_web_vitals": 2.0,
+    "lighthouse_performance": 2.0,
     # security
     "https": 3.0,
     "mixed_content": 2.0,
@@ -133,6 +140,25 @@ LOAD_OK_MS = 2500
 HTML_SIZE_GOOD_KB = 100
 HTML_SIZE_OK_KB = 250
 RENDER_BLOCKING_OK = 5
+
+# --- Core Web Vitals (PageSpeed Insights; only when a PSI key is in play) ---
+# These are Google's own published good / needs-improvement boundaries, not
+# thresholds of our own choosing. They are what the Chrome UX Report uses to
+# bucket a URL, so diverging from them would mean reporting a page as healthy
+# that Google itself counts as failing.
+LCP_GOOD_MS = 2500
+LCP_OK_MS = 4000
+CLS_GOOD = 0.1
+CLS_OK = 0.25
+INP_GOOD_MS = 200
+INP_OK_MS = 500
+# Total Blocking Time is the lab stand-in for INP: interaction latency cannot
+# be measured without a real user interacting, so Lighthouse approximates it.
+TBT_GOOD_MS = 200
+TBT_OK_MS = 600
+# Lighthouse's own category banding (green / orange / red).
+LIGHTHOUSE_GOOD = 90
+LIGHTHOUSE_OK = 50
 
 # --- Common misspellings checked against page text ---
 COMMON_TYPOS = {

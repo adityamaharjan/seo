@@ -7,6 +7,7 @@ breaking an audit hours later.
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import crypto
+from app.core.config import settings
 from app.core.exceptions import BadRequestError, NotFoundError, ServiceUnavailableError
 from app.core.logging import get_logger
 from app.crud import api_key as api_key_crud
@@ -75,6 +76,56 @@ async def get_key(
     if row is None or not crypto.is_available():
         return None
     return crypto.decrypt(row.encrypted_key)
+
+
+async def resolve_psi_key(
+    db: AsyncSession, user_id: int, *, requested: bool | None
+) -> str | None:
+    """Decide whether this run uses PageSpeed, and with which key.
+
+    ``requested`` is the per-run choice: True to insist, False to skip, None to
+    take whatever the account has. The asymmetry on a missing key is
+    deliberate — someone who explicitly asked for PageSpeed data should be told
+    it cannot happen, at submit time, before quota is charged; someone who just
+    left the default alone should quietly get the report they always got.
+
+    Falling back to the server's own key is a development affordance only. In
+    production it would put every user's audits on one 25k/day quota and one
+    bill, so there it stays bring-your-own-key.
+    """
+    if requested is False:
+        return None
+
+    key = await get_key(db, user_id=user_id, provider=ApiKeyProvider.google_psi)
+    if key is None and not settings.is_production:
+        key = settings.GOOGLE_PAGE_SPEED_INSIGHTS_API_KEY.strip() or None
+
+    if key is None and requested is True:
+        raise BadRequestError(
+            "PageSpeed data was requested but no PageSpeed Insights key is saved "
+            "on this account. Add one in Account settings, or run without it."
+        )
+    return key
+
+
+async def record_psi_outcome(
+    db: AsyncSession, user_id: int, *, error: str | None
+) -> None:
+    """Note how the user's key behaved on the last run.
+
+    This is what makes ``last_used_at`` and ``last_error`` in the settings
+    screen real: a key that has started failing on quota shows up there instead
+    of silently producing reports with no PageSpeed data in them. A run that
+    used the development fallback has no row to record against, which is why a
+    missing row is not an error here.
+    """
+    row = await api_key_crud.get(db, user_id, ApiKeyProvider.google_psi)
+    if row is None:
+        return
+    if error:
+        await api_key_crud.record_failure(db, row, error)
+    else:
+        await api_key_crud.record_use(db, row)
 
 
 async def settings_for_user(db: AsyncSession, user_id: int) -> ApiKeySettings:

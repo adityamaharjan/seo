@@ -46,6 +46,7 @@ Complete reference for the SEO Analysis API. For setup and running, see the
   - [DELETE /site-audits/{id}](#delete-site-auditsid)
 - [Health](#health)
 - [SEO result schema](#seo-result-schema)
+- [PageSpeed Insights](#pagespeed-insights)
 - [Data model](#data-model)
 
 ---
@@ -266,6 +267,7 @@ the background worker; poll `status_url` for the result. **Auth required.**
 |-------|------|-------|
 | `url` | string (URL) | Valid `http(s)` URL pointing at a **public** host |
 | `target_keywords` | array of string | Optional, up to **5**, each ≤100 chars. Terms this page should be judged against. Whitespace is collapsed and case-insensitive duplicates dropped |
+| `use_psi` | bool\|null | Optional. `true` requires PageSpeed Insights data, `false` skips it, omitted uses the account's saved key if there is one. See [PageSpeed Insights](#pagespeed-insights) |
 
 **Target keywords.** Given any, the response carries a separate
 [`keyword_report`](#keyword_report) scoring each keyword on *placement* — title, H1,
@@ -427,6 +429,8 @@ page count** — the page budget is what bounds the work. **Auth required.**
 |-------|------|-------|
 | `url` | string (URL) | Valid `http(s)` URL pointing at a **public** host |
 | `max_pages` | int | Optional, `1`–`50`, default `10`. Upper bound on pages crawled; the crawl may find fewer |
+| `use_psi` | bool\|null | Optional. As for `POST /analyses` |
+| `psi_scope` | string | Optional, one of `off`, `homepage`, `sample`, `all`. Default `all`. How many crawled pages get a PageSpeed run — each costs roughly 10–30s per strategy and one unit of the key's daily quota |
 
 **`202 Accepted`**
 
@@ -439,8 +443,9 @@ page count** — the page budget is what bounds the work. **Auth required.**
 }
 ```
 
-Errors: `401`, `422` (bad URL, private target, or `max_pages` out of range), `429`
-(quota), `503` (queue unavailable — quota is refunded).
+Errors: `401`, `400` (`use_psi: true` with no key saved), `422` (bad URL, private
+target, `max_pages` out of range, or unknown `psi_scope`), `429` (quota), `503`
+(queue unavailable — quota is refunded).
 
 ### GET /site-audits
 
@@ -836,14 +841,78 @@ and category weights.
 
 ---
 
+## PageSpeed Insights
+
+Rendered metrics — Core Web Vitals, Lighthouse scores, and Lighthouse's ranked
+list of fixes — require a real browser, so they come from the Google PageSpeed
+Insights API rather than from the HTTP fetch. The API is free at 25,000
+requests/day, but keyless calls share an anonymous quota pool that is
+permanently exhausted, so a key is mandatory in practice.
+
+### Bringing a key
+
+Keys are per user, stored Fernet-encrypted, and managed through
+[`/users/me/api-keys`](#get-usersmeapi-keys). The server holds no shared key in
+production: a server-wide key would put every user's audits on one daily quota
+and one bill. `GOOGLE_PAGE_SPEED_INSIGHTS_API_KEY` exists only as a
+development fallback and is ignored when `ENVIRONMENT=production`.
+
+### Choosing per run
+
+`use_psi` is tri-state, and the three values differ in how a missing key is
+handled:
+
+| `use_psi` | With a key saved | With no key saved |
+|-----------|------------------|-------------------|
+| `true` | Runs PageSpeed | **`400`** at submit time, before quota is charged |
+| omitted | Runs PageSpeed | Runs without it, silently |
+| `false` | Skips PageSpeed | Runs without it |
+
+The asymmetry is deliberate: someone who explicitly asked for the data should be
+told when it cannot happen, while someone who left the default alone should get
+the report they have always got. `false` also means turning PageSpeed off for one
+run never requires deleting the stored key.
+
+For a crawl, `psi_scope` bounds how much of it pays the cost. `homepage` runs
+one page, `sample` the first five in crawl order (breadth-first, so the
+shallowest and most linked-to), `all` every crawled page. At roughly 10–30
+seconds per page per strategy, `all` on a 50-page crawl is a materially longer
+job than the same crawl without it.
+
+### What it adds
+
+Five checks in the `performance` category, all of which report themselves as
+`info` (and go unscored) when PageSpeed did not run:
+
+| Check | Scored | Source |
+|-------|--------|--------|
+| `field_vitals` | Yes, weight 3.0 | CrUX — real Chrome users, 75th percentile, the measurement Google ranks on. Falls back to origin-level data when the URL has too little traffic, and reports which was used |
+| `core_web_vitals` | Yes, weight 2.0 | Lighthouse lab run — LCP, CLS and TBT. The worst metric decides the verdict, because passing Core Web Vitals requires all of them to pass |
+| `lighthouse_performance` | Yes, weight 2.0 | Lighthouse's own 0–100 performance score |
+| `pagespeed_opportunities` | No | Ranked fixes with estimated savings. Unscored because every item is already reflected in the checks above |
+| `lighthouse_categories` | No | Accessibility, best-practices and SEO scores. Reported but not scored, so a report run with a key stays comparable with one run without |
+
+When both strategies run, **mobile is what gets scored** — Google indexes and
+ranks on the mobile crawl — while desktop travels in the payload for display.
+
+A PageSpeed failure never fails the analysis: Google being slow, rate-limiting
+or down costs the run its rendered metrics and nothing else. The error is
+recorded against the stored key and surfaces as `last_error` in
+[`/users/me/api-keys`](#get-usersmeapi-keys).
+
+Reports carry `used_psi`, and audits carry `used_psi` and `psi_scope`, so a
+consumer can tell which runs have rendered metrics in them.
+
+---
+
 ## Data model
 
 | Table | Key columns |
 |-------|-------------|
 | `users` | `id`, `username` (unique), `email` (unique), `hashed_password`, `role` (`user`/`admin`), `is_active`, timestamps |
 | `quotas` | `user_id` (unique FK), `daily_limit`, `used_today`, `day_reset_date`, `monthly_limit`, `used_this_month`, `month_reset_date` |
-| `seo_reports` | `id`, `user_id` (FK), `url`, `final_url`, `domain`, `status`, `job_id`, `error`, `quota_refunded`, `title`, `target_keywords` (JSON), `overall_score`, `overall_grade`, `ttfb_ms`, `load_time_ms`, `results` (JSON), timestamps. Composite index on (`user_id`, `created_at`) |
-| `site_audits` | `id`, `user_id` (FK), `start_url`, `domain`, `status`, `job_id`, `error`, `quota_refunded`, `max_pages`, `pages_crawled`, `pages_failed`, `discovery_source`, `overall_score`, `overall_grade`, `results` (JSON), timestamps. Composite index on (`user_id`, `created_at`) |
+| `seo_reports` | `id`, `user_id` (FK), `url`, `final_url`, `domain`, `status`, `job_id`, `error`, `quota_refunded`, `title`, `target_keywords` (JSON), `overall_score`, `overall_grade`, `used_psi`, `ttfb_ms`, `load_time_ms`, `results` (JSON), timestamps. Composite index on (`user_id`, `created_at`) |
+| `site_audits` | `id`, `user_id` (FK), `start_url`, `domain`, `status`, `job_id`, `error`, `quota_refunded`, `max_pages`, `pages_crawled`, `pages_failed`, `discovery_source`, `overall_score`, `overall_grade`, `used_psi`, `psi_scope`, `results` (JSON), timestamps. Composite index on (`user_id`, `created_at`) |
 | `site_audit_pages` | `id`, `audit_id` (FK, cascade), `url`, `final_url`, `title`, `status_code`, `overall_score`, `overall_grade`, `ttfb_ms`, `load_time_ms`, `issue_counts` (JSON), `error`, `results` (JSON), timestamps |
 | `refresh_tokens` | `id`, `user_id` (FK), `jti` (unique), `token_hash`, `expires_at`, `revoked`, timestamps |
 

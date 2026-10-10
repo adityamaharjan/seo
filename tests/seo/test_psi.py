@@ -4,11 +4,14 @@ Everything here runs against captured response shapes rather than the live
 API: a real PSI call is 10-30 seconds and consumes quota, which makes it
 unusable in a test suite.
 """
+import asyncio
+
 import httpx
 import pytest
 import respx
 
-from app.seo import psi
+from app.seo import analyzer, psi
+from app.seo.checks import ALL_CHECKS
 from app.seo.checks import performance as perf_checks
 from app.seo.constants import LCP_GOOD_MS
 from tests.seo.test_checks import build_context
@@ -259,6 +262,58 @@ async def test_a_psi_outage_never_fails_the_analysis():
         )
     assert results == {}
     assert "unreachable" in error
+
+
+@pytest.mark.asyncio
+async def test_a_dead_key_stops_the_rest_of_the_audit():
+    """Once Google says the key is out of quota, waiting runs are skipped
+    instead of each calling Google to fail the same way."""
+    semaphore, stop = asyncio.Semaphore(1), asyncio.Event()
+    with respx.mock:
+        route = respx.get(psi.ENDPOINT).mock(
+            return_value=httpx.Response(429, json={"error": {"message": "Quota exceeded"}})
+        )
+        outcomes = await asyncio.gather(*(
+            psi.run_strategies(f"https://example.com/{i}", "key", ["mobile"],
+                               semaphore=semaphore, stop=stop)
+            for i in range(3)
+        ))
+    assert route.call_count == 1
+    assert "Quota exceeded" in outcomes[0][1]
+    assert all(error.startswith("Skipped") for _, error in outcomes[1:])
+
+
+@pytest.mark.asyncio
+async def test_a_transient_failure_does_not_stop_the_audit():
+    stop = asyncio.Event()
+    with respx.mock:
+        respx.get(psi.ENDPOINT).mock(return_value=httpx.Response(500, json={}))
+        await psi.run_strategies("https://example.com", "key", ["mobile"], stop=stop)
+    assert not stop.is_set()
+
+
+def test_a_late_psi_result_rescores_the_page():
+    """A crawl runs PageSpeed after the page analysis; folding it in must
+    rescore the page exactly as if it had run inline."""
+    ctx = build_context("good.html")
+    checks = [check(ctx) for check in ALL_CHECKS]
+    result = {"checks": [c.__dict__ for c in checks]}
+    data = {"strategies": {"mobile": psi.parse(lighthouse_payload(performance=0.30,
+                                                                  lcp_ms=9000.0))},
+            "error": None}
+
+    analyzer.apply_psi(result, data)
+
+    by_id = {c["id"]: c for c in result["checks"]}
+    assert by_id["lighthouse_performance"]["score"] == 30
+    assert by_id["core_web_vitals"]["status"] == "critical"
+    assert result["psi"] is data
+    assert len(result["checks"]) == len(checks)
+
+    ctx.extra["psi"] = data
+    inline = analyzer._score_fields([check(ctx) for check in ALL_CHECKS])
+    assert result["overall_score"] == inline["overall_score"]
+    assert result["category_scores"] == inline["category_scores"]
 
 
 def test_google_thresholds_are_unchanged():

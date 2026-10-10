@@ -2,6 +2,7 @@
 import json
 
 from app.seo.types import AnalysisContext, CheckResult
+from app.seo.text import attr
 
 CATEGORY = "meta"
 
@@ -42,9 +43,9 @@ def check_json_ld(ctx: AnalysisContext) -> CheckResult:
 
 def check_open_graph(ctx: AnalysisContext) -> CheckResult:
     found = {
-        tag.get("property"): tag.get("content")
+        attr(tag, "property"): attr(tag, "content")
         for tag in ctx.soup.find_all("meta", attrs={"property": True})
-        if (tag.get("property") or "").startswith("og:")
+        if attr(tag, "property").startswith("og:")
     }
     required = {"og:title", "og:description", "og:image"}
     missing = sorted(required - set(found))
@@ -69,9 +70,9 @@ def check_open_graph(ctx: AnalysisContext) -> CheckResult:
 
 def check_twitter_card(ctx: AnalysisContext) -> CheckResult:
     found = [
-        tag.get("name")
+        attr(tag, "name")
         for tag in ctx.soup.find_all("meta", attrs={"name": True})
-        if (tag.get("name") or "").startswith("twitter:")
+        if attr(tag, "name").startswith("twitter:")
     ]
     if found:
         return CheckResult(

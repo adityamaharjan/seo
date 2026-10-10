@@ -1,8 +1,6 @@
 """Pytest fixtures: in-memory async DB, ASGI client, dependency overrides."""
-import asyncio
 from collections.abc import AsyncGenerator
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
@@ -16,13 +14,6 @@ from app.api.deps import get_arq
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture

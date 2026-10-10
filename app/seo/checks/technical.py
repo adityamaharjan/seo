@@ -1,13 +1,14 @@
 """Technical / mobile checks: viewport, charset, doctype, favicon, HTTPS."""
 from app.seo.types import AnalysisContext, CheckResult
+from app.seo.text import attr
 
 
 def check_viewport(ctx: AnalysisContext) -> CheckResult:
     tag = ctx.soup.find("meta", attrs={"name": "viewport"})
-    if tag and (tag.get("content") or "").strip():
+    if content := attr(tag, "content").strip():
         return CheckResult(
             "mobile_viewport", "mobile", "good", 100, "Mobile viewport",
-            "Responsive viewport meta tag present.", value=tag.get("content"),
+            "Responsive viewport meta tag present.", value=content,
         )
     return CheckResult(
         "mobile_viewport", "mobile", "critical", 0, "Mobile viewport",
@@ -18,7 +19,7 @@ def check_viewport(ctx: AnalysisContext) -> CheckResult:
 
 def check_charset(ctx: AnalysisContext) -> CheckResult:
     has = ctx.soup.find("meta", attrs={"charset": True}) or ctx.soup.find(
-        "meta", attrs={"http-equiv": lambda v: v and v.lower() == "content-type"}
+        "meta", attrs={"http-equiv": lambda v: v is not None and v.lower() == "content-type"}
     )
     if has:
         return CheckResult(

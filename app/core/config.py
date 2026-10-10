@@ -150,8 +150,9 @@ class Settings(BaseSettings):
     # A PSI run is a real Lighthouse execution on Google's infrastructure, so
     # it takes far longer than any other call the analyzer makes.
     PSI_TIMEOUT_SECONDS: int = 90
-    # Strategies run per URL. Mobile is what Google ranks on; desktop is worth
-    # having alongside it, at double the time and quota.
+    # Strategies run per URL. Mobile is what Google ranks on and what gets
+    # scored; desktop is shown beside it in the report, at double the time and
+    # quota.
     PSI_STRATEGIES: Annotated[list[str], NoDecode] = ["mobile", "desktop"]
     # Concurrent PSI calls per audit. PSI allows 240 queries/minute per key, so
     # the binding constraint is the audit's own wall-clock budget, not the API.

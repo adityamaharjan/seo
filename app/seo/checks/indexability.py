@@ -5,6 +5,7 @@ injected via ``ctx.robots_txt`` / ``ctx.sitemap_found``.
 """
 from app.seo.robots import RobotsTxt, path_of
 from app.seo.types import AnalysisContext, CheckResult
+from app.seo.text import attr
 
 CATEGORY = "indexability"
 
@@ -82,7 +83,7 @@ def check_sitemap(ctx: AnalysisContext) -> CheckResult:
 def check_hreflang(ctx: AnalysisContext) -> CheckResult:
     tags = ctx.soup.find_all("link", attrs={"rel": "alternate", "hreflang": True})
     if tags:
-        langs = [t.get("hreflang") for t in tags]
+        langs = [attr(t, "hreflang") for t in tags]
         return CheckResult(
             "hreflang", CATEGORY, "good", 100, "hreflang",
             f"hreflang annotations present for: {', '.join(langs)}.", value=langs,

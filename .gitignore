@@ -1,5 +1,4 @@
 .vscode/
-.github/
 .env
 .env.*
 !.env.example

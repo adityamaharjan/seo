@@ -282,3 +282,13 @@ def test_heading_hierarchy_good_page():
     ctx = build_context("good.html")
     res = heading_checks.check_heading_hierarchy(ctx)
     assert res.status == "good"
+
+
+def test_attr_reads_single_and_multi_valued_attributes():
+    from app.seo.text import attr
+
+    soup = BeautifulSoup('<link rel="icon shortcut" href=" /f.ico "><meta>', "lxml")
+    assert attr(soup.find("link"), "rel") == "icon shortcut"  # BS4 gives a list here
+    assert attr(soup.find("link"), "href") == " /f.ico "
+    assert attr(soup.find("meta"), "content") == ""
+    assert attr(None, "content") == ""

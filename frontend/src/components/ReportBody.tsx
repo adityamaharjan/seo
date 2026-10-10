@@ -19,6 +19,7 @@ import type {
   CheckResult,
   CheckStatus,
   KeywordReport,
+  PsiRun,
   SeoResult,
 } from '../api/types'
 import { Notice } from './Notice'
@@ -28,6 +29,14 @@ import { StatusPill } from './StatusPill'
 import { Finding, FindingDetail, FindingFix, FindingList } from './Finding'
 import { EmptyState, Section, Stat, StatGrid } from './Page'
 import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { categoryLabel, formatDate, formatKb, formatMs, renderValue } from '../lib/format'
 import { cn } from '@/lib/utils'
 
@@ -177,6 +186,10 @@ export function ReportBody({ results, targetKeywords, badge }: Props) {
           <Stat label="Compressed" value={results.timing.compressed ? 'Yes' : 'No'} />
         </StatGrid>
       </Section>
+
+      {results.psi && Object.keys(results.psi.strategies).length > 0 ? (
+        <PageSpeedSection strategies={results.psi.strategies} />
+      ) : null}
 
       {keywords ? <KeywordSection report={keywords} /> : null}
 
@@ -378,6 +391,60 @@ function KeywordSection({ report }: { report: KeywordReport }) {
           <FindingFix>{report.recommendation}</FindingFix>
         </div>
       ) : null}
+    </Section>
+  )
+}
+
+/** Rows of the mobile/desktop comparison, in Lighthouse's own order. */
+const PSI_ROWS: { label: string; read: (run: PsiRun) => ReactNode }[] = [
+  { label: 'Performance', read: (r) => scoreCell(r.scores.performance) },
+  { label: 'Accessibility', read: (r) => scoreCell(r.scores.accessibility) },
+  { label: 'Best practices', read: (r) => scoreCell(r.scores['best-practices']) },
+  { label: 'SEO', read: (r) => scoreCell(r.scores.seo) },
+  { label: 'Largest Contentful Paint', read: (r) => formatMs(r.lab.lcp_ms) },
+  { label: 'Cumulative Layout Shift', read: (r) => r.lab.cls?.toFixed(3) ?? '—' },
+  { label: 'Total Blocking Time', read: (r) => formatMs(r.lab.tbt_ms) },
+  { label: 'First Contentful Paint', read: (r) => formatMs(r.lab.fcp_ms) },
+  { label: 'Speed Index', read: (r) => formatMs(r.lab.speed_index_ms) },
+]
+
+function scoreCell(score: number | null | undefined): ReactNode {
+  if (score === null || score === undefined) return '—'
+  return <span className={cn('font-semibold', scoreTextClass(score))}>{score}</span>
+}
+
+/**
+ * Mobile and desktop Lighthouse runs side by side. Only mobile is scored,
+ * because Google ranks on the mobile crawl; desktop is here for comparison.
+ */
+function PageSpeedSection({ strategies }: { strategies: Record<string, PsiRun> }) {
+  const order = ['mobile', 'desktop'].filter((name) => strategies[name])
+  return (
+    <Section title="PageSpeed" meta="Lighthouse lab run · mobile is scored" headingId="pagespeed">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead>Metric</TableHead>
+            {order.map((name) => (
+              <TableHead key={name} className="text-right capitalize">
+                {name}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {PSI_ROWS.map((row) => (
+            <TableRow key={row.label}>
+              <TableCell>{row.label}</TableCell>
+              {order.map((name) => (
+                <TableCell key={name} className="text-right whitespace-nowrap tabular-nums">
+                  {row.read(strategies[name])}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </Section>
   )
 }

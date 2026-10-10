@@ -17,6 +17,7 @@ Two things this module deliberately does *not* do:
   specifically about the key.
 """
 import asyncio
+import contextlib
 from typing import Any
 
 import httpx
@@ -76,6 +77,18 @@ class PsiKeyInvalidError(ValueError):
 
 class PsiError(RuntimeError):
     """A PSI run failed for a reason that is not about the key."""
+
+
+class PsiKeyUnusableError(PsiError):
+    """Quota exhausted (429) or the API is not enabled for the key (403).
+
+    Every later call with the same key fails the same way. The per-minute limit
+    (240/min) also returns 429, but an audit's concurrency stays far below it.
+    """
+
+
+# Reported for runs skipped after the key failed earlier in the same audit.
+_STOPPED = "Skipped: the PageSpeed key stopped working earlier in this audit."
 
 
 async def validate_key(api_key: str) -> None:
@@ -223,12 +236,7 @@ async def run(
     client: httpx.AsyncClient, url: str, api_key: str, strategy: str
 ) -> dict:
     """Run one PSI analysis. Raises :class:`PsiError` if it does not complete."""
-    params = [
-        ("url", url),
-        ("key", api_key),
-        ("strategy", strategy),
-        *(("category", c) for c in CATEGORIES),
-    ]
+    params = {"url": url, "key": api_key, "strategy": strategy, "category": list(CATEGORIES)}
     try:
         response = await client.get(ENDPOINT, params=params)
     except httpx.HTTPError as exc:
@@ -242,6 +250,8 @@ async def run(
             message = response.text[:200]
         if _INVALID_KEY_MARKER in message.lower():
             raise PsiKeyInvalidError("Google rejected this PageSpeed key.")
+        if response.status_code in (403, 429):
+            raise PsiKeyUnusableError(message or f"PageSpeed Insights returned {response.status_code}.")
         raise PsiError(message or f"PageSpeed Insights returned {response.status_code}.")
 
     try:
@@ -256,6 +266,7 @@ async def run_strategies(
     strategies: list[str] | None = None,
     *,
     semaphore: asyncio.Semaphore | None = None,
+    stop: asyncio.Event | None = None,
 ) -> tuple[dict[str, dict], str | None]:
     """Run PSI for each strategy, returning ``(results, error)``.
 
@@ -267,7 +278,9 @@ async def run_strategies(
     the caller their analysis.
 
     ``semaphore`` bounds concurrency across a whole audit, where one crawl can
-    otherwise launch a PSI call per page at once.
+    otherwise launch a PSI call per page at once. ``stop`` is shared across an
+    audit too: once the key is rejected or out of quota it is set, and every
+    run still waiting is skipped instead of calling Google to fail again.
     """
     wanted = strategies or settings.PSI_STRATEGIES
     results: dict[str, dict] = {}
@@ -275,18 +288,22 @@ async def run_strategies(
 
     async def one(client: httpx.AsyncClient, strategy: str) -> None:
         nonlocal first_error
-        try:
-            if semaphore is not None:
-                async with semaphore:
-                    results[strategy] = await run(client, url, api_key, strategy)
-            else:
+        async with semaphore or contextlib.nullcontext():
+            if stop is not None and stop.is_set():
+                first_error = first_error or _STOPPED
+                return
+            try:
                 results[strategy] = await run(client, url, api_key, strategy)
-        except (PsiError, PsiKeyInvalidError) as exc:
-            logger.warning(
-                "psi run failed",
-                extra={"url": url, "strategy": strategy, "error": str(exc)},
-            )
-            first_error = first_error or str(exc)
+            except (PsiError, PsiKeyInvalidError) as exc:
+                logger.warning(
+                    "psi run failed",
+                    extra={"url": url, "strategy": strategy, "error": str(exc)},
+                )
+                first_error = first_error or str(exc)
+                if stop is not None and isinstance(
+                    exc, (PsiKeyInvalidError, PsiKeyUnusableError)
+                ):
+                    stop.set()
 
     timeout = httpx.Timeout(settings.PSI_TIMEOUT_SECONDS)
     async with httpx.AsyncClient(timeout=timeout) as client:

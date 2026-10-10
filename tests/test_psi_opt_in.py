@@ -248,3 +248,76 @@ def test_psi_budget_per_scope():
     assert _psi_budget(audit(PsiScope.sample, max_pages=2)) == 2
     # An audit predating the feature has no scope stored at all.
     assert _psi_budget(audit(None)) == 0
+
+
+def test_audit_summary_lists_pagespeed_pages_slowest_first():
+    from app.services.site_audit_service import aggregate
+
+    def page(url, performance, psi=True):
+        return url, {
+            "fetched_ok": True, "final_url": url, "title": None,
+            "overall_score": 80, "overall_grade": "B",
+            "checks": [
+                {"id": "lighthouse_performance", "status": "info", "label": "",
+                 "category": "performance",
+                 "value": {"score": performance, "strategies": {"desktop": 99}}},
+                {"id": "core_web_vitals", "status": "info", "label": "",
+                 "category": "performance", "value": {"lcp_ms": 2000, "cls": 0.01}},
+            ],
+            "psi": {"strategies": {"mobile": {}}} if psi else None,
+        }
+
+    summary = aggregate("https://example.com", [
+        page("https://example.com/fast", 95),
+        page("https://example.com/slow", 40),
+        page("https://example.com/unmeasured", None, psi=False),
+    ], source="links")
+
+    assert [row["url"] for row in summary["pagespeed"]] == [
+        "https://example.com/slow", "https://example.com/fast",
+    ]
+    assert summary["pagespeed"][0]["lcp_ms"] == 2000
+    assert summary["pagespeed"][0]["desktop_performance"] == 99
+
+
+@pytest.mark.asyncio
+async def test_crawl_runs_pagespeed_on_the_budget_and_stops_at_the_deadline(monkeypatch):
+    """PageSpeed runs beside the crawl on the first N fetched pages, and a run
+    still going at the deadline is cut off with a reason instead of hanging."""
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.services import site_audit_service as svc
+
+    urls = [f"https://example.com/{i}" for i in range(8)]
+
+    async def signals(client, start):
+        return SimpleNamespace(as_page_signals=lambda: {})
+
+    async def sitemap(client, signals, limit):
+        return urls[1:]
+
+    async def analyze(url, **kwargs):
+        return {"fetched_ok": True, "final_url": url, "checks": []}
+
+    async def slow_psi(url, key, **kwargs):
+        if url.endswith("/0"):
+            return {"mobile": {}}, None
+        await asyncio.sleep(5)
+
+    applied = {}
+    monkeypatch.setattr(svc.crawler, "load_site_signals", signals)
+    monkeypatch.setattr(svc.crawler, "urls_from_sitemaps", sitemap)
+    monkeypatch.setattr(svc.analyzer, "analyze", analyze)
+    monkeypatch.setattr(svc.analyzer, "apply_psi", lambda r, d: applied.update({r["final_url"]: d}))
+    monkeypatch.setattr(svc.psi, "run_strategies", slow_psi)
+    monkeypatch.setattr(settings, "SITE_AUDIT_TIMEOUT_SECONDS", 0.3)
+    monkeypatch.setattr(svc, "_PSI_GRACE_SECONDS", 0)
+
+    audit = SiteAudit(start_url=urls[0], max_pages=8, psi_scope=PsiScope.sample)
+    results, _ = await svc._crawl(audit, "key")
+
+    assert len(results) == 8
+    assert sorted(applied) == sorted(urls[:PSI_SAMPLE_SIZE])
+    assert applied[urls[0]]["strategies"] == {"mobile": {}}
+    assert applied[urls[1]]["error"].startswith("Skipped: the audit ran out of time")

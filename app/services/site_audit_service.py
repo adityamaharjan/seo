@@ -26,7 +26,7 @@ from app.models.site_audit import (
     SiteAuditPage,
     SiteAuditStatus,
 )
-from app.seo import analyzer, crawler
+from app.seo import analyzer, crawler, psi
 from app.seo.scoring import STATUSES, grade
 from app.services import api_key_service, quota_service
 
@@ -37,6 +37,9 @@ logger = get_logger(__name__)
 _SITEWIDE_THRESHOLD = 0.5
 # Example URLs carried with each ranked issue, so a fix has somewhere to start.
 _EXAMPLES_PER_ISSUE = 5
+# How long PageSpeed may run past the crawl deadline; must stay under the
+# worker's 120s job-timeout margin.
+_PSI_GRACE_SECONDS = 60
 
 
 async def mark_failed(
@@ -74,6 +77,26 @@ def _page_row(audit_id: int, url: str, result: dict) -> SiteAuditPage:
     )
 
 
+def _pagespeed_row(result: dict) -> dict:
+    """One page's PageSpeed figures, read from its checks so they are the
+    mobile numbers the page was scored on."""
+    checks = {c["id"]: c for c in result.get("checks") or []}
+    vitals = checks.get("core_web_vitals") or {}
+    lab = vitals.get("value") or {}
+    return {
+        "url": result["final_url"],
+        "title": result.get("title"),
+        "performance": ((checks.get("lighthouse_performance") or {}).get("value") or {}).get("score"),
+        "desktop_performance": (
+            ((checks.get("lighthouse_performance") or {}).get("value") or {}).get("strategies") or {}
+        ).get("desktop"),
+        "vitals_status": vitals.get("status"),
+        "lcp_ms": lab.get("lcp_ms"),
+        "cls": lab.get("cls"),
+        "tbt_ms": lab.get("tbt_ms"),
+    }
+
+
 def aggregate(start_url: str, results: list[tuple[str, dict]], *, source: str) -> dict:
     """Roll per-page analyses up into one site-level report.
 
@@ -90,7 +113,7 @@ def aggregate(start_url: str, results: list[tuple[str, dict]], *, source: str) -
     issue_meta: dict[str, dict] = {}
     category_totals: dict[str, list[int]] = defaultdict(list)
     category_weights: dict[str, float] = {}
-    counts = Counter()
+    counts: Counter[str] = Counter()
     capped_pages: list[dict] = []
 
     for result in ok:
@@ -143,24 +166,29 @@ def aggregate(start_url: str, results: list[tuple[str, dict]], *, source: str) -
         key=lambda i: (i["status"] != "critical", -i["affected_pages"], i["id"]),
     )
 
-    categories = sorted(
-        (
-            {
-                "category": name,
-                "score": round(statistics.fmean(values)),
-                "grade": grade(round(statistics.fmean(values))),
-                "weight": category_weights.get(name, 0.0),
-            }
-            for name, values in category_totals.items()
-        ),
-        key=lambda c: -c["weight"],
-    )
+    categories = [
+        {
+            "category": name,
+            "score": round(statistics.fmean(values)),
+            "grade": grade(round(statistics.fmean(values))),
+            "weight": category_weights.get(name, 0.0),
+        }
+        for name, values in sorted(
+            category_totals.items(), key=lambda kv: -category_weights.get(kv[0], 0.0)
+        )
+    ]
 
     overall = round(statistics.fmean(scores)) if scores else 0
     worst = sorted(
         ({"url": r["final_url"], "title": r.get("title"), "score": r["overall_score"],
           "grade": r["overall_grade"]} for r in ok),
         key=lambda p: p["score"],
+    )
+
+    # Slowest first; a page whose Lighthouse score is missing sorts last.
+    pagespeed = sorted(
+        (_pagespeed_row(r) for r in ok if (r.get("psi") or {}).get("strategies")),
+        key=lambda row: (row["performance"] is None, row["performance"] or 0),
     )
 
     return {
@@ -183,6 +211,7 @@ def aggregate(start_url: str, results: list[tuple[str, dict]], *, source: str) -
         "top_issues": top_issues,
         "worst_pages": worst[:10],
         "capped_pages": capped_pages,
+        "pagespeed": pagespeed,
         "errors": [{"url": u, "error": r.get("error")} for u, r in failed],
     }
 
@@ -232,16 +261,25 @@ async def _crawl(audit: SiteAudit, psi_key: str | None) -> tuple[list[tuple[str,
     page_signals = signals.as_page_signals()
     results: list[tuple[str, dict]] = []
     semaphore = asyncio.Semaphore(settings.SITE_AUDIT_CONCURRENCY)
-    # PSI gets its own limit, deliberately higher than the crawl's. Page
-    # concurrency is kept low to be a good citizen towards the site being
-    # audited; PSI calls go to Google instead, cost nothing from that host, and
-    # are slow enough that running them four at a time would dominate the
-    # audit's wall-clock budget.
+    # PageSpeed runs as its own tasks, beside the crawl rather than inside it:
+    # a Lighthouse run is 10-30s against Google, and holding a crawl slot for
+    # it would stall the whole batch and link discovery behind it. It gets its
+    # own, higher limit because those calls cost the audited host nothing.
     psi_semaphore = asyncio.Semaphore(settings.PSI_CONCURRENCY)
+    psi_stop = asyncio.Event()
     psi_budget = _psi_budget(audit) if psi_key else 0
-    psi_spent = 0
+    psi_tasks: dict[asyncio.Task, dict] = {}
 
-    async def analyze_one(url: str, with_psi: bool) -> tuple[str, dict]:
+    async def psi_one(result: dict, key: str) -> None:
+        strategies, error = await psi.run_strategies(
+            result["final_url"], key, semaphore=psi_semaphore, stop=psi_stop
+        )
+        try:
+            analyzer.apply_psi(result, {"strategies": strategies, "error": error})
+        except Exception as exc:  # the page keeps its PSI-less result
+            logger.warning("psi merge failed", extra={"url": result["final_url"], "error": str(exc)})
+
+    async def analyze_one(url: str) -> tuple[str, dict]:
         async with semaphore:
             try:
                 return url, await analyzer.analyze(
@@ -249,8 +287,6 @@ async def _crawl(audit: SiteAudit, psi_key: str | None) -> tuple[list[tuple[str,
                     site_signals=page_signals,
                     collect_links=follow_links,
                     max_broken_checks=settings.SITE_AUDIT_BROKEN_LINK_CHECKS,
-                    psi_key=psi_key if with_psi else None,
-                    psi_semaphore=psi_semaphore,
                 )
             except Exception as exc:  # one bad page must not end the crawl
                 logger.warning("page analysis failed", extra={"url": url, "error": str(exc)})
@@ -262,15 +298,13 @@ async def _crawl(audit: SiteAudit, psi_key: str | None) -> tuple[list[tuple[str,
         remaining = audit.max_pages - len(results)
         batch = queue[: min(settings.SITE_AUDIT_CONCURRENCY, remaining)]
         del queue[: len(batch)]
-        # Spend the PSI budget on the earliest pages in the batch, so a scope
-        # narrower than the crawl lands on the shallowest URLs rather than
-        # wherever the batch boundary happens to fall.
-        psi_flags = [psi_spent + i < psi_budget for i in range(len(batch))]
-        psi_spent += sum(psi_flags)
-        for url, result in await asyncio.gather(
-            *(analyze_one(u, flag) for u, flag in zip(batch, psi_flags, strict=True))
-        ):
+        for url, result in await asyncio.gather(*(analyze_one(u) for u in batch)):
             results.append((url, result))
+            # Pages arrive in discovery order, so a scope narrower than the
+            # crawl spends its budget on the shallowest, most linked-to pages.
+            # Only fetched pages count against it.
+            if psi_key and result.get("fetched_ok") and len(psi_tasks) < psi_budget:
+                psi_tasks[asyncio.create_task(psi_one(result, psi_key))] = result
             # Stop discovering once enough URLs are known. Filtering marks a URL
             # as seen, so looking for links we have no room to queue would
             # retire them permanently and leave the crawl short of its budget.
@@ -282,6 +316,18 @@ async def _crawl(audit: SiteAudit, psi_key: str | None) -> tuple[list[tuple[str,
             if discovered:
                 source = "mixed" if seeded else "links"
             queue.extend(discovered)
+
+    if psi_tasks:
+        # The grace keeps PSI inside the worker's job timeout, which allows the
+        # crawl deadline plus 120s.
+        _, pending = await asyncio.wait(
+            psi_tasks, timeout=max(deadline - time.monotonic(), 0) + _PSI_GRACE_SECONDS
+        )
+        for task in pending:
+            task.cancel()
+            analyzer.apply_psi(psi_tasks[task], {"strategies": {}, "error": (
+                "Skipped: the audit ran out of time before PageSpeed reached this page."
+            )})
 
     return results, source
 

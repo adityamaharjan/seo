@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Panel } from './Page'
 import { ThemeToggle } from './ThemeToggle'
+import { Credit } from './Credit'
 
 export function AuthShell({
   title,
@@ -50,6 +51,7 @@ export function AuthShell({
         <p className="mt-5 text-center text-[13.5px] text-muted-foreground">
           {footer}
         </p>
+        <Credit className="mt-8 block text-center text-[12.5px] text-muted-foreground" />
       </div>
     </div>
   )

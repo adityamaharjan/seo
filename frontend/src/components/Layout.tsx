@@ -30,6 +30,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { Credit } from './Credit'
 
 const NAV = [
   { to: '/app', label: 'Page audit', end: true },
@@ -168,6 +169,9 @@ export function Layout() {
       <main id="main" className="mx-auto max-w-(--measure) px-5 pt-10 pb-28 sm:px-6">
         <Outlet />
       </main>
+      <footer className="mx-auto max-w-(--measure) px-5 pb-10 text-[13px] text-muted-foreground sm:px-6">
+        <Credit />
+      </footer>
     </TooltipProvider>
   )
 }

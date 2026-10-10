@@ -1,5 +1,6 @@
 """Image checks: alt text, dimensions, lazy-loading, next-gen formats."""
 from app.seo.types import AnalysisContext, CheckResult
+from app.seo.text import attr
 
 CATEGORY = "content"
 _NEXT_GEN = (".webp", ".avif")
@@ -12,7 +13,7 @@ def check_image_alt(ctx: AnalysisContext) -> CheckResult:
             "image_alt", CATEGORY, "info", 100, "Image alt text",
             "No images on the page.", value={"total": 0},
         )
-    missing = [img.get("src", "?") for img in imgs if not (img.get("alt") or "").strip()]
+    missing = [attr(img, "src") or "?" for img in imgs if not attr(img, "alt").strip()]
     total = len(imgs)
     if not missing:
         return CheckResult(
@@ -38,10 +39,10 @@ def check_image_optimization(ctx: AnalysisContext) -> CheckResult:
             "No images on the page.", value={"total": 0},
         )
     total = len(imgs)
-    lazy = sum(1 for i in imgs if (i.get("loading") or "").lower() == "lazy")
+    lazy = sum(1 for i in imgs if attr(i, "loading").lower() == "lazy")
     no_dims = sum(1 for i in imgs if not i.get("width") or not i.get("height"))
     next_gen = sum(
-        1 for i in imgs if (i.get("src", "").lower()).endswith(_NEXT_GEN)
+        1 for i in imgs if attr(i, "src").lower().endswith(_NEXT_GEN)
     )
     score = 100
     if no_dims:

@@ -6,6 +6,7 @@ result is injected via ``ctx.broken_links``.
 from urllib.parse import urljoin, urlparse
 
 from app.seo.types import AnalysisContext, CheckResult
+from app.seo.text import attr
 
 CATEGORY = "links"
 
@@ -21,7 +22,7 @@ def classify_links(ctx: AnalysisContext) -> tuple[list[str], list[str]]:
     domain = ctx.fetch.domain
     internal, external = [], []
     for a in ctx.soup.find_all("a", href=True):
-        href = a["href"].strip()
+        href = attr(a, "href").strip()
         if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")):
             continue
         absolute = urljoin(ctx.fetch.final_url, href)

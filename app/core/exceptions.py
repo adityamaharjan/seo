@@ -6,6 +6,7 @@ into a consistent envelope::
     {"error": {"code": "...", "message": "...", "details": {...}}}
 """
 import json
+from collections.abc import Sequence
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -76,7 +77,7 @@ class QuotaExceededError(AppException):
     message = "Quota exceeded"
 
 
-def _serializable_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _serializable_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
     """Flatten pydantic errors into something JSON can encode.
 
     Pydantic puts the original exception object in ``ctx`` whenever a custom

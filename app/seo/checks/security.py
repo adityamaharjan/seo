@@ -1,5 +1,6 @@
 """Security header checks and mixed-content detection."""
 from app.seo.types import AnalysisContext, CheckResult
+from app.seo.text import attr
 
 CATEGORY = "security"
 
@@ -36,9 +37,9 @@ def check_mixed_content(ctx: AnalysisContext) -> CheckResult:
             "Page is not HTTPS; mixed-content check skipped.", value=None,
         )
     insecure = []
-    for tag, attr in (("img", "src"), ("script", "src"), ("link", "href")):
+    for tag, name in (("img", "src"), ("script", "src"), ("link", "href")):
         for el in ctx.soup.find_all(tag):
-            ref = el.get(attr, "")
+            ref = attr(el, name)
             if ref.startswith("http://"):
                 insecure.append(ref)
     if not insecure:

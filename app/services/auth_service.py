@@ -67,13 +67,14 @@ async def refresh(db: AsyncSession, refresh_token: str) -> TokenPair:
     jti = payload.get("jti")
     res = await db.execute(select(RefreshToken).where(RefreshToken.jti == jti))
     stored = res.scalar_one_or_none()
+    if not stored:
+        raise AuthenticationError("Refresh token is invalid or expired.")
     # Some backends (e.g. SQLite) return naive datetimes; treat them as UTC.
-    expires_at = stored.expires_at if stored else None
-    if expires_at is not None and expires_at.tzinfo is None:
+    expires_at = stored.expires_at
+    if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=UTC)
     if (
-        not stored
-        or stored.revoked
+        stored.revoked
         or stored.token_hash != security.hash_token(refresh_token)
         or expires_at < datetime.now(UTC)
     ):

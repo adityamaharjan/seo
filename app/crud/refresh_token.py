@@ -1,5 +1,8 @@
 """Data-access functions for refresh tokens."""
+from typing import cast
+
 from sqlalchemy import select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.refresh_token import RefreshToken
@@ -18,7 +21,7 @@ async def revoke_all_for_user(db: AsyncSession, user_id: int) -> int:
         .values(revoked=True)
     )
     await db.flush()
-    return result.rowcount or 0
+    return cast(CursorResult, result).rowcount or 0
 
 
 async def count_active_for_user(db: AsyncSession, user_id: int) -> int:

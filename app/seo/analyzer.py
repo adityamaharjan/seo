@@ -7,6 +7,8 @@ sitemap, broken links) -> run all synchronous checks -> score -> assemble the
 import asyncio
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
+from typing import cast
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -17,9 +19,10 @@ from app.core.logging import get_logger
 from app.seo import fetcher, psi, urlguard
 from app.seo.checks import ALL_CHECKS
 from app.seo.checks.links import classify_links
+from app.seo.checks.performance import PSI_CHECKS
 from app.seo.keywords import analyze_keywords
 from app.seo.scoring import STATUSES, grade, score_categories
-from app.seo.text import extract_clean_text, tokenize
+from app.seo.text import attr, extract_clean_text, tokenize
 from app.seo.types import AnalysisContext, CheckResult, FetchResult
 
 logger = get_logger(__name__)
@@ -122,8 +125,8 @@ async def _gather_async_signals(
             also just a string in the HTML until it's actually fetched, so we
             verify it resolves rather than taking its presence on faith.
             """
-            icon = ctx.soup.find("link", attrs={"rel": lambda v: v and "icon" in v.lower()})
-            href = (icon.get("href") or "").strip() if icon else ""
+            icon = ctx.soup.find("link", attrs={"rel": lambda v: v is not None and "icon" in v.lower()})
+            href = attr(icon, "href").strip()
             ctx.extra["favicon_declared"] = bool(href)
             for candidate in filter(None, [href, "favicon.ico"]):
                 try:
@@ -245,8 +248,6 @@ async def analyze(
                 extra={"check": getattr(check, "__name__", "?"), "error": str(exc)},
             )
 
-    breakdown = score_categories(checks)
-
     result = {
         "id": f"report-{uuid.uuid4().hex[:8]}",
         "url": fetch.requested_url,
@@ -255,14 +256,10 @@ async def analyze(
         "generated_at": datetime.now(UTC).isoformat(),
         "fetched_ok": True,
         "status_code": fetch.status_code,
-        "overall_score": breakdown.overall,
-        "overall_grade": breakdown.grade,
-        "uncapped_score": breakdown.uncapped_overall,
-        "capped_by": breakdown.capped_by,
+        **_score_fields(checks),
         # Keyword targeting rides along in the same response but is scored
         # independently and never folded into overall_score.
         "keyword_report": analyze_keywords(ctx),
-        "issue_counts": breakdown.issue_counts,
         "title": title,
         "timing": {
             "ttfb_ms": fetch.ttfb_ms,
@@ -272,8 +269,6 @@ async def analyze(
             "compressed": fetch.compressed,
             "redirect_count": fetch.redirect_count,
         },
-        "category_scores": breakdown.categories,
-        "checks": [c.__dict__ for c in checks],
         # Carried whole so the report can show both strategies side by side,
         # while the checks above score the mobile one.
         "psi": ctx.extra.get("psi"),
@@ -284,4 +279,31 @@ async def analyze(
     return result
 
 
-__all__ = ["analyze", "grade"]
+def _score_fields(checks: list[CheckResult]) -> dict:
+    breakdown = score_categories(checks)
+    return {
+        "overall_score": breakdown.overall,
+        "overall_grade": breakdown.grade,
+        "uncapped_score": breakdown.uncapped_overall,
+        "capped_by": breakdown.capped_by,
+        "issue_counts": breakdown.issue_counts,
+        "category_scores": breakdown.categories,
+        "checks": [c.__dict__ for c in checks],
+    }
+
+
+def apply_psi(result: dict, psi_data: dict) -> None:
+    """Fold a PageSpeed run made after the page was analyzed into its result.
+
+    A crawl runs PageSpeed apart from the page analysis so a 10-30s Lighthouse
+    run never holds up the crawl. The PSI checks read nothing but
+    ``ctx.extra["psi"]``, so a context carrying only that is enough to re-run
+    them and rescore the page.
+    """
+    ctx = cast(AnalysisContext, SimpleNamespace(extra={"psi": psi_data}))
+    fresh = {c.id: c for c in (check(ctx) for check in PSI_CHECKS)}
+    checks = [fresh.get(c["id"]) or CheckResult(**c) for c in result["checks"]]
+    result.update(_score_fields(checks), psi=psi_data)
+
+
+__all__ = ["analyze", "apply_psi", "grade"]

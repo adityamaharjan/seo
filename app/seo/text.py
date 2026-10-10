@@ -6,12 +6,24 @@ reusable across checks and independently testable.
 import re
 import string
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from app.seo.constants import STOP_WORDS
 
 _NON_CONTENT_TAGS = ["script", "style", "nav", "footer", "header", "aside", "form", "noscript"]
 _PUNCT_RE = re.compile(f"[{re.escape(string.punctuation)}]")
+
+
+def attr(tag: Tag | None, name: str) -> str:
+    """A tag's attribute as text, or "" when the tag or attribute is missing.
+
+    BeautifulSoup types every attribute as possibly multi-valued (``class``,
+    ``rel``), so a list value is joined back with spaces.
+    """
+    value = tag.get(name) if tag is not None else None
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else " ".join(value)
 
 
 def extract_clean_text(soup: BeautifulSoup) -> str:

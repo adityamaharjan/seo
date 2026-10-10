@@ -491,6 +491,7 @@ One site audit including the aggregate and every crawled page. **Auth required.*
     ],
     "worst_pages": [{ "url": "https://example.com/x", "title": "X", "score": 41, "grade": "F" }],
     "capped_pages": [{ "url": "https://example.com/x", "score": 40, "capped_by": ["meta_robots"] }],
+    "pagespeed": [{ "url": "https://example.com/", "title": "Home", "performance": 62, "desktop_performance": 91, "vitals_status": "warning", "lcp_ms": 3100, "cls": 0.02, "tbt_ms": 240 }],
     "errors": [{ "url": "https://example.com/gone", "error": "Fetch failed with status 404" }]
   },
   "pages": [
@@ -875,9 +876,13 @@ run never requires deleting the stored key.
 
 For a crawl, `psi_scope` bounds how much of it pays the cost. `homepage` runs
 one page, `sample` the first five in crawl order (breadth-first, so the
-shallowest and most linked-to), `all` every crawled page. At roughly 10–30
-seconds per page per strategy, `all` on a 50-page crawl is a materially longer
-job than the same crawl without it.
+shallowest and most linked-to), `all` every crawled page. Only pages that
+were fetched count towards the scope. PageSpeed runs alongside the crawl, up to
+`PSI_CONCURRENCY` (default 6) at a time, and never holds it up. At roughly
+10–30 seconds a run, `all` on a 50-page crawl still adds a few minutes. A run
+still going 60 seconds after the crawl deadline is cut off, and that page
+reports why it has no PageSpeed data. If the key is rejected or out of quota,
+the remaining runs in that audit are skipped instead of each failing.
 
 ### What it adds
 
@@ -892,8 +897,16 @@ Five checks in the `performance` category, all of which report themselves as
 | `pagespeed_opportunities` | No | Ranked fixes with estimated savings. Unscored because every item is already reflected in the checks above |
 | `lighthouse_categories` | No | Accessibility, best-practices and SEO scores. Reported but not scored, so a report run with a key stays comparable with one run without |
 
-When both strategies run, **mobile is what gets scored** — Google indexes and
-ranks on the mobile crawl — while desktop travels in the payload for display.
+Both mobile and desktop run by default (`PSI_STRATEGIES=mobile,desktop`).
+**Mobile is what gets scored**, because Google indexes and ranks on the mobile
+crawl. Desktop is shown beside it: in the report's PageSpeed panel, in the
+`lighthouse_performance` message, and under `psi.strategies.desktop`. Setting
+`PSI_STRATEGIES=mobile` halves the time and quota.
+
+A site audit's `results.pagespeed` lists every page that got a PageSpeed run,
+slowest mobile Lighthouse score first, with `performance` (mobile),
+`desktop_performance`, and the mobile `lcp_ms`, `cls`, `tbt_ms` and
+`core_web_vitals` status.
 
 A PageSpeed failure never fails the analysis: Google being slow, rate-limiting
 or down costs the run its rendered metrics and nothing else. The error is

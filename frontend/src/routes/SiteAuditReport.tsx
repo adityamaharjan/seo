@@ -32,7 +32,7 @@ import { categoryLabel, formatDate, formatMs, shortUrl } from '../lib/format'
 /** A crawl of 50 pages can run for minutes, so polling runs longer than a report's. */
 const MAX_POLLS = 200
 
-function pollDelay(attempt: number): number {
+export function pollDelay(attempt: number): number {
   if (attempt < 4) return 1500
   if (attempt < 20) return 3000
   return 5000
@@ -247,6 +247,60 @@ export function SiteAuditReport() {
           >
             <CategoryMeters categories={results.category_scores} />
           </Section>
+
+          {results.pagespeed?.length ? (
+            <Section
+              title="PageSpeed"
+              meta="Lighthouse scores · vitals are mobile · slowest first"
+              headingId="pagespeed"
+            >
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Page</TableHead>
+                    <TableHead className="text-right">Mobile</TableHead>
+                    <TableHead className="text-right">Desktop</TableHead>
+                    <TableHead className="text-right">LCP</TableHead>
+                    <TableHead className="text-right">CLS</TableHead>
+                    <TableHead className="text-right">TBT</TableHead>
+                    <TableHead className="text-right">Vitals</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {results.pagespeed.map((row) => (
+                    <TableRow key={row.url}>
+                      <TableCell className="max-w-[440px]">
+                        <span className="block truncate font-medium">
+                          {row.title || shortUrl(row.url)}
+                        </span>
+                        <span className="block truncate text-[12.5px] text-muted-foreground">
+                          {shortUrl(row.url)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.performance ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.desktop_performance ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">
+                        {formatMs(row.lcp_ms)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.cls === null ? '—' : row.cls.toFixed(3)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">
+                        {formatMs(row.tbt_ms)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.vitals_status ? <StatusPill status={row.vitals_status} /> : '—'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Section>
+          ) : null}
 
           <Section title="Pages" meta="Worst first" headingId="pages">
             <Table>

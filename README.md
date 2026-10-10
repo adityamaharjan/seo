@@ -11,6 +11,9 @@ is a separate project — this service exposes a clean, versioned JSON API.
 - **Full endpoint & response reference (Markdown):** [docs/API.md](docs/API.md)
 - **Web frontend:** [frontend/](frontend/) — a static Vite + React app, built and deployed separately
 
+**License:** [MIT with attribution](LICENSE). Free for any use, including commercial.
+Hosted copies must keep the visible "Created by @adityamaharjan" credit. See [License](#license).
+
 ---
 
 ## Table of contents
@@ -31,6 +34,7 @@ is a separate project — this service exposes a clean, versioned JSON API.
 14. [Frontend](#frontend)
 15. [Testing](#testing)
 16. [Troubleshooting](#troubleshooting)
+17. [License](#license)
 
 ---
 
@@ -509,10 +513,16 @@ pytest                                  # full suite (in-memory SQLite; no MySQL
 pytest tests/seo                        # SEO checks against committed HTML fixtures
 pytest --cov --cov-report=term-missing  # with coverage
 ruff check app tests
+mypy app
+
+cd frontend
+npm run lint                            # ESLint
+npm test                                # Vitest
+npm run build                           # type-check and production build
 ```
 
-Both run on every push and pull request via [.github/workflows/ci.yml](.github/workflows/ci.yml),
-which fails below 70% coverage. The suite needs outbound DNS: the SSRF guard
+All of these run on every push and pull request via
+[.github/workflows/ci.yml](.github/workflows/ci.yml), which fails below 70% coverage. The suite needs outbound DNS: the SSRF guard
 resolves hostnames even when the HTTP layer is mocked.
 
 ## Troubleshooting
@@ -529,3 +539,17 @@ resolves hostnames even when the HTTP layer is mocked.
 | `503 service_unavailable` on submit | Redis was unreachable when queueing. The report is failed and the quota refunded; check Redis and retry. |
 | App won't start with "Unsafe configuration for ENVIRONMENT=production" | Working as intended. Fix the listed settings; see [Security](#security). |
 | `429 rate_limited` (not `quota_exceeded`) | Auth endpoint rate limit, not the daily quota. Tune `LOGIN_RATE_LIMIT` / `SIGNUP_RATE_LIMIT`. |
+
+## License
+
+Created by [@adityamaharjan](https://github.com/adityamaharjan). Released under the
+[MIT License with an attribution term](LICENSE):
+
+- **Use it for anything**, including commercial use: host it, modify it, sell it.
+- **Keep the credit:** any copy that other people can use must keep the visible
+  "Created by @adityamaharjan" credit, linking to https://github.com/adityamaharjan.
+  The frontend already shows it (`frontend/src/components/Credit.tsx`).
+- **Add your own name:** you can credit yourself next to it as the person who
+  modified or hosts it.
+
+[LICENSE](LICENSE) has the full terms.

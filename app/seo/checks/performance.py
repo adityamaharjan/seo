@@ -274,13 +274,21 @@ def check_lighthouse_performance(ctx: AnalysisContext) -> CheckResult:
         status = "warning"
     else:
         status = "critical"
+    by_strategy = {
+        name: run.get("scores", {}).get("performance")
+        for name, run in ((ctx.extra.get("psi") or {}).get("strategies") or {}).items()
+    }
+    # Only mobile is scored; any other strategy that ran is named here, since
+    # this message is the only place the report shows it.
+    others = ", ".join(
+        f"{name} {value}/100" for name, value in by_strategy.items()
+        if name != "mobile" and value is not None and "mobile" in by_strategy
+    )
     return CheckResult(
         "lighthouse_performance", CATEGORY, status, score, "Lighthouse performance",
-        f"Lighthouse scores this page {score}/100 for performance.",
-        value={"score": score, "strategies": {
-            name: run.get("scores", {}).get("performance")
-            for name, run in ((ctx.extra.get("psi") or {}).get("strategies") or {}).items()
-        }},
+        f"Lighthouse scores this page {score}/100 for performance"
+        + (f" on mobile ({others})." if others else "."),
+        value={"score": score, "strategies": by_strategy},
         recommendation=(
             None if status == "good"
             else "See the PageSpeed opportunities below for the specific changes "
@@ -356,15 +364,21 @@ def check_lighthouse_categories(ctx: AnalysisContext) -> CheckResult:
     )
 
 
+# The checks that read only ``ctx.extra["psi"]``, so they can be re-run once a
+# PageSpeed result arrives after the rest of the page was analyzed.
+PSI_CHECKS = [
+    check_core_web_vitals,
+    check_field_vitals,
+    check_lighthouse_performance,
+    check_pagespeed_opportunities,
+    check_lighthouse_categories,
+]
+
 CHECKS = [
     check_ttfb,
     check_load_time,
     check_page_size,
     check_compression,
     check_render_blocking,
-    check_core_web_vitals,
-    check_field_vitals,
-    check_lighthouse_performance,
-    check_pagespeed_opportunities,
-    check_lighthouse_categories,
+    *PSI_CHECKS,
 ]

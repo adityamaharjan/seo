@@ -6,8 +6,10 @@ crawled page, and every rotation leaves a dead token behind. The worker runs
 :func:`purge` nightly so the tables stay a working set rather than an archive.
 """
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from sqlalchemy import delete, or_
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -27,7 +29,7 @@ async def purge(db: AsyncSession) -> dict[str, int]:
     if settings.REPORT_RETENTION_DAYS > 0:
         cutoff = now - timedelta(days=settings.REPORT_RETENTION_DAYS)
         result = await db.execute(delete(Report).where(Report.created_at < cutoff))
-        removed["reports"] = result.rowcount or 0
+        removed["reports"] = cast(CursorResult, result).rowcount or 0
 
         # Site audits store a full analysis per crawled page, so one audit can
         # be fifty times the payload of a single report. Leaving them out of
@@ -36,7 +38,7 @@ async def purge(db: AsyncSession) -> dict[str, int]:
         result = await db.execute(
             delete(SiteAudit).where(SiteAudit.created_at < cutoff)
         )
-        removed["site_audits"] = result.rowcount or 0
+        removed["site_audits"] = cast(CursorResult, result).rowcount or 0
 
     token_cutoff = now - timedelta(days=settings.TOKEN_RETENTION_DAYS)
     result = await db.execute(
@@ -47,7 +49,7 @@ async def purge(db: AsyncSession) -> dict[str, int]:
             )
         )
     )
-    removed["refresh_tokens"] = result.rowcount or 0
+    removed["refresh_tokens"] = cast(CursorResult, result).rowcount or 0
 
     await db.commit()
     logger.info("retention purge complete", extra=removed)

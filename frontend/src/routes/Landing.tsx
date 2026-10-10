@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Credit } from '../components/Credit'
 
 /** Mirrors the engine. See app/seo/constants.py and app/core/config.py. */
 const TOTAL_CHECKS = 35
@@ -433,6 +434,7 @@ export function Landing() {
           <span className="size-2.5 rounded-full bg-primary ring-4 ring-accent-soft" />
           SEO Analysis
         </span>
+        <Credit />
         <span className="flex-1" />
         <nav className="flex items-center gap-1">
           {(signedIn

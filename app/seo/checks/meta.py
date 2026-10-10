@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from app.seo.constants import DESC_MAX, DESC_MIN, TITLE_MAX, TITLE_MIN, TITLE_PIXEL_SAFE_MAX
 from app.seo.types import AnalysisContext, CheckResult
+from app.seo.text import attr
 
 CATEGORY = "meta"
 
@@ -34,7 +35,7 @@ def check_title(ctx: AnalysisContext) -> CheckResult:
 
 def check_meta_description(ctx: AnalysisContext) -> CheckResult:
     tag = ctx.soup.find("meta", attrs={"name": "description"})
-    desc = (tag.get("content") or "").strip() if tag else ""
+    desc = attr(tag, "content").strip()
     length = len(desc)
     if not desc:
         return CheckResult(
@@ -56,8 +57,8 @@ def check_meta_description(ctx: AnalysisContext) -> CheckResult:
 
 
 def check_canonical(ctx: AnalysisContext) -> CheckResult:
-    tag = ctx.soup.find("link", attrs={"rel": lambda v: v and "canonical" in v})
-    href = (tag.get("href") or "").strip() if tag else ""
+    tag = ctx.soup.find("link", attrs={"rel": lambda v: v is not None and "canonical" in v})
+    href = attr(tag, "href").strip()
     if not href:
         return CheckResult(
             "canonical", CATEGORY, "warning", 50, "Canonical URL",
@@ -79,8 +80,8 @@ def check_meta_robots(ctx: AnalysisContext) -> CheckResult:
     header, and search engines honour both equally. Reading only the tag missed
     every page whose CMS or CDN sets the header instead.
     """
-    tag = ctx.soup.find("meta", attrs={"name": lambda v: v and v.lower() == "robots"})
-    meta_content = (tag.get("content") or "").lower().strip() if tag else ""
+    tag = ctx.soup.find("meta", attrs={"name": lambda v: v is not None and v.lower() == "robots"})
+    meta_content = attr(tag, "content").lower().strip()
     header_content = ctx.fetch.headers.get("x-robots-tag", "").lower().strip()
 
     sources = {"meta": meta_content or None, "header": header_content or None}
@@ -106,7 +107,7 @@ def check_meta_robots(ctx: AnalysisContext) -> CheckResult:
 
 def check_lang(ctx: AnalysisContext) -> CheckResult:
     html_tag = ctx.soup.find("html")
-    lang = (html_tag.get("lang") or "").strip() if html_tag else ""
+    lang = attr(html_tag, "lang").strip()
     if lang:
         return CheckResult(
             "html_lang", CATEGORY, "good", 100, "Language declaration",

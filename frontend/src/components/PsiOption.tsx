@@ -83,13 +83,16 @@ interface PsiOptionProps {
   maxPages?: number
 }
 
-/** Rough per-page cost of a PSI run across both strategies, in seconds. */
-const SECONDS_PER_PAGE = 25
+/** Rough cost of one Lighthouse run, in seconds. */
+const SECONDS_PER_RUN = 25
+/** Mirror the server's PSI_STRATEGIES (mobile, desktop) and PSI_CONCURRENCY defaults. */
+const RUNS_PER_PAGE = 2
+const PARALLEL_RUNS = 6
 
-function estimate(scope: PsiScope, maxPages: number): string {
+export function estimate(scope: PsiScope, maxPages: number): string {
   const pages =
     scope === 'all' ? maxPages : scope === 'sample' ? Math.min(5, maxPages) : 1
-  const seconds = pages * SECONDS_PER_PAGE
+  const seconds = Math.ceil((pages * RUNS_PER_PAGE) / PARALLEL_RUNS) * SECONDS_PER_RUN
   if (seconds < 90) return `about ${seconds} seconds`
   return `about ${Math.round(seconds / 60)} minutes`
 }

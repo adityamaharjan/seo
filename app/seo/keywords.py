@@ -23,6 +23,7 @@ from app.seo.constants import (
     KEYWORD_PLACEMENT_WEIGHTS,
 )
 from app.seo.types import AnalysisContext
+from app.seo.text import attr
 
 _GOOD_SCORE = 70
 _WARNING_SCORE = 40
@@ -124,14 +125,14 @@ def _placements(ctx: AnalysisContext, keyword: str) -> dict[str, str | None]:
         "title": match(title.get_text(strip=True) if title else None),
         "h1": match(h1.get_text(strip=True) if h1 else None),
         "meta_description": match(
-            (description.get("content") or "") if description else None
+            attr(description, "content") if description else None
         ),
         "first_paragraph": match(opening),
         "subheading": best(
             [tag.get_text(strip=True) for tag in soup.find_all(["h2", "h3", "h4", "h5", "h6"])]
         ),
         "url_slug": match(slug),
-        "image_alt": best([img.get("alt") or "" for img in soup.find_all("img")]),
+        "image_alt": best([attr(img, "alt") for img in soup.find_all("img")]),
     }
 
 
@@ -175,7 +176,7 @@ def _score_keyword(ctx: AnalysisContext, keyword: str, applicable: dict[str, boo
     missing = [
         slot
         for slot in sorted(
-            KEYWORD_PLACEMENT_WEIGHTS, key=KEYWORD_PLACEMENT_WEIGHTS.get, reverse=True
+            KEYWORD_PLACEMENT_WEIGHTS, key=lambda s: KEYWORD_PLACEMENT_WEIGHTS[s], reverse=True
         )
         if applicable[slot] and not placements[slot]
     ]

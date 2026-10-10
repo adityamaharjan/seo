@@ -164,7 +164,21 @@ export interface SeoResult {
   timing: Timing
   category_scores: CategoryScore[]
   checks: CheckResult[]
+  /** PageSpeed runs by strategy; absent or null when PageSpeed did not run. */
+  psi?: { strategies: Record<string, PsiRun>; error: string | null } | null
   error: string | null
+}
+
+/** One Lighthouse run, trimmed by the server to what the report shows. */
+export interface PsiRun {
+  scores: Partial<Record<'performance' | 'accessibility' | 'best-practices' | 'seo', number | null>>
+  lab: {
+    lcp_ms?: number
+    cls?: number
+    tbt_ms?: number
+    fcp_ms?: number
+    speed_index_ms?: number
+  }
 }
 
 export interface ReportDetail extends ReportSummary {
@@ -289,6 +303,17 @@ export interface SiteAuditResults {
   top_issues: SiteIssue[]
   worst_pages: { url: string; title: string | null; score: number; grade: string }[]
   capped_pages: { url: string; score: number; capped_by: string[] }[]
+  /** Pages that got a PageSpeed run, slowest first. Absent on older audits. */
+  pagespeed?: {
+    url: string
+    title: string | null
+    performance: number | null
+    desktop_performance: number | null
+    vitals_status: CheckStatus | null
+    lcp_ms: number | null
+    cls: number | null
+    tbt_ms: number | null
+  }[]
   errors: { url: string; error: string | null }[]
 }
 

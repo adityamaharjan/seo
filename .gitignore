@@ -1,48 +1,52 @@
-.vscode/
+# Secrets (keep the committed examples)
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+
+# Local app data
 .seo
-
-
-# Byte-code files
-*.pyc
-__pycache__/
-# For users on Windows:
-Python.exe
-# For users on macOS:
-*.pyo
-# For users on Linux:
-*.pyd
-
-# Runtime generated files
 *.log
 *.sqlite3
 *.db
 
-# Virtual environment
-venv/
-env/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+/build/
+/dist/
+
+# Virtual environments (incl. a venv created in the repo root)
 .venv/
+venv/
+/env/
 /lib/
 /bin/
 /include/
-share/
+/share/
+pyvenv.cfg
 
-# IDE-specific files (uncomment the ones you use)
-# .idea/  # PyCharm
-.vscode/ # VS Code
-
-# Dependency caches
+# Tool caches
 .pip/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
-# OS-specific files
-.DS_Store # macOS
-Thumbs.db # Windows
 
 # Coverage
 .coverage
+.coverage.*
 coverage.xml
 htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code / graphify local state
+.claude/settings.local.json
+graphify-out/
+test.txt

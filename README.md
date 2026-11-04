@@ -14,6 +14,9 @@ is a separate project — this service exposes a clean, versioned JSON API.
 **License:** [MIT with attribution](LICENSE). Free for any use, including commercial.
 Hosted copies must keep the visible "Created by @adityamaharjan" credit. See [License](#license).
 
+**Contributing:** improvements are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
+the checks a pull request must pass, and how the code is organised.
+
 ---
 
 ## Table of contents
@@ -104,7 +107,8 @@ legacy/      the superseded prototype, kept for reference only
 
 ## Requirements
 
-- Python **3.12+**
+- Python **3.13+** and [**uv**](https://docs.astral.sh/uv/getting-started/installation/),
+  which manages dependencies (uv can install Python 3.13 for you)
 - **MySQL 8.x** (the `asyncmy` driver needs build tools: `build-essential`,
   `default-libmysqlclient-dev`, `pkg-config`)
 - **Redis 6+** (for the ARQ job queue)
@@ -112,18 +116,19 @@ legacy/      the superseded prototype, kept for reference only
 ## Quick start (local)
 
 ```bash
-cd /var/www/seo
-python -m venv .seo && source .seo/bin/activate
-pip install -r requirements.txt
+uv sync                       # creates .venv from uv.lock, dev tools included
 
 cp .env.example .env          # then edit DB / JWT / Redis values
-alembic upgrade head          # create the schema
+uv run alembic upgrade head   # create the schema
 
 # Terminal 1 — API
-uvicorn app.main:app --reload --port 8001
+uv run uvicorn app.main:app --reload --port 8001
 # Terminal 2 — worker
-arq app.workers.settings.WorkerSettings
+uv run arq app.workers.settings.WorkerSettings
 ```
+
+Dependencies live in `pyproject.toml` and are pinned in `uv.lock`. Add one with
+`uv add <package>` (or `uv add --dev <package>` for tooling), and commit both files.
 
 Open http://localhost:8001/docs.
 
@@ -190,9 +195,16 @@ docker compose up --build
 ## Production deploy (systemd)
 
 Two unit files are provided in [deploy/](deploy/). The API runs as `www-data`
-from the project venv on port 8001.
+from the project's `.venv` on port 8001.
 
 ```bash
+# Install runtime dependencies into /var/www/seo/.venv (no dev tools).
+# The Python install dir must be readable by www-data, so keep it out of $HOME.
+sudo mkdir -p /opt/uv/python && sudo chown "$USER" /opt/uv/python
+cd /var/www/seo
+UV_PYTHON_INSTALL_DIR=/opt/uv/python uv sync --locked --no-dev
+uv run --no-sync alembic upgrade head
+
 # Redis (durable, via Docker) — or use a host redis-server
 sudo docker run -d --restart unless-stopped -p 6379:6379 --name redis redis
 
@@ -324,10 +336,10 @@ curl -s $BASE/analyses/$ID -H "authorization: Bearer $TOKEN" | python3 -m json.t
 The admin endpoints require an admin, so the first one is made on the server:
 
 ```bash
-cd /var/www/seo && source .seo/bin/activate
+cd /var/www/seo
 
-python -m scripts.manage_users list
-python -m scripts.manage_users promote you@example.com
+.venv/bin/python -m scripts.manage_users list
+.venv/bin/python -m scripts.manage_users promote you@example.com
 ```
 
 `demote`, `disable` and `enable` are available too. Everything after that can be
@@ -531,7 +543,7 @@ resolves hostnames even when the HTTP layer is mocked.
 |---------|--------------------|
 | Analysis stuck on `pending` | Worker not running → start `seo-worker.service` / `arq …`. Check `journalctl -u seo-worker`. |
 | `502` / API won't start | Redis unreachable (lifespan creates an ARQ pool). Verify `REDIS_URL` and that Redis is up. |
-| `ModuleNotFoundError: asyncmy` | `pip install asyncmy` (needs `build-essential`, `default-libmysqlclient-dev`, `pkg-config`). |
+| `uv sync` fails building `asyncmy` | Install the build tools it needs: `build-essential`, `default-libmysqlclient-dev`, `pkg-config`. |
 | `failed to locate a name 'Quota'` | All models must be imported before mapper config — `app.db.session` imports the registry; don't bypass it. |
 | 401 on every request | Missing/expired access token, or `JWT_SECRET` changed (invalidates issued tokens). |
 | Migration is an ALTER diff, not CREATE | The DB still has old tables. Start from a clean schema before generating the initial migration. |

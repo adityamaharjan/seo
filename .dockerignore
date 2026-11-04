@@ -10,3 +10,7 @@ htmlcov
 legacy
 frontend/node_modules
 frontend/dist
+.env
+.env.*
+!.env.example
+.mypy_cache

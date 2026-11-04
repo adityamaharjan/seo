@@ -19,7 +19,21 @@
 
 ### Deploying
 
-- No migration and no config change needed.
+- **uv is now the only Python package manager.** `requirements.txt` is gone;
+  `pyproject.toml` and `uv.lock` are the single source of dependencies.
+- **Docker:** the image now runs Python 3.13 (it was 3.12, which nothing was
+  tested on), installs from `uv.lock` without dev tools, and no longer copies
+  `.env` into the image.
+- **systemd servers, one-time switch:** the units now run from `.venv` instead
+  of `.seo`. On the server:
+  ```bash
+  sudo mkdir -p /opt/uv/python && sudo chown "$USER" /opt/uv/python
+  cd /var/www/seo && UV_PYTHON_INSTALL_DIR=/opt/uv/python uv sync --locked --no-dev
+  sudo cp deploy/*.service /etc/systemd/system/ && sudo systemctl daemon-reload
+  sudo systemctl restart uvicorn seo-worker
+  ```
+  The old `.seo` directory can be deleted once both services are running.
+- No database migration needed.
 
 ## 2026-09-17 — PageSpeed Insights
 

@@ -6,7 +6,7 @@ After=network.target
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/seo
-ExecStart=/var/www/seo/.seo/bin/arq app.workers.settings.WorkerSettings
+ExecStart=/var/www/seo/.venv/bin/arq app.workers.settings.WorkerSettings
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1

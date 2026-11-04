@@ -7,7 +7,7 @@ After=network.target
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/seo
-ExecStart=/var/www/seo/.seo/bin/uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 3
+ExecStart=/var/www/seo/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 3
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
